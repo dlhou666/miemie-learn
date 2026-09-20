@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="咩咩学" />
+<meta name="theme-color" content="#EDF5FC" />
+<meta name="format-detection" content="telephone=no" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png" />
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<title>咩咩学 · iPad 学习激励系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#3F97E3; --blue-deep:#2E7CC0; --blue-soft:#E1F0FC;
+  --ink:#2E4257; --gray:#8296A9; --gray-2:#5C7186; --gray-3:#9FB2C4;
+  --gold:#E8A317; --gold-ink:#B4770E; --gold-soft:#FDF1DA; --cream:#FFF3D2;
+  --green:#3E9A6C; --green-soft:#E2F4EA; --green-2:#4CAF87;
+  --coral:#E06A55; --coral-soft:#FCE8E4;
+  --purple-soft:#EDE7FA;
+  --bg:#EDF5FC; --bg-parent:#F2F6FB; --bg-party:#FFF6E0;
+  --card:#FFFFFF; --line:#D8E6F2; --field:#F2F7FC; --row:#F7FAFD; --muted:#F2F5F8;
+  --sh-card:0 4px 14px -2px rgba(89,128,166,.10);
+  --sh-hero:0 10px 24px -6px rgba(61,128,199,.28);
+  --sh-btn:0 5px 12px -2px rgba(63,151,227,.35);
+  --sh-cta:0 6px 14px -2px rgba(63,151,227,.35);
+  --sh-nav:0 8px 20px -4px rgba(76,115,153,.12);
+  --sh-gold:0 5px 12px -2px rgba(230,168,41,.35);
+  --sh-party:0 12px 30px -6px rgba(140,102,26,.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+html,body{height:100%;}
+body{
+  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  background:linear-gradient(160deg,#DCE8F4 0%,#C9D9E8 100%);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.stage{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.device{
+  position:relative;width:820px;height:1180px;flex:none;
+  border-radius:22px;overflow:hidden;background:#FFFFFF;
+  box-shadow:0 30px 70px -20px rgba(24,52,80,.45),0 0 0 10px #1E2A38;
+  transform:scale(var(--s,1));transform-origin:center center;
+}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* ---------- 通用 ---------- */
+.statusbar{height:62px;flex:none;padding:0 28px;display:flex;align-items:center;justify-content:space-between;}
+.sb-time{font-size:17px;font-weight:600;color:var(--ink);}
+.sb-icons{display:flex;align-items:center;gap:7px;}
+.content{flex:1;padding:28px;display:flex;flex-direction:column;gap:22px;overflow:hidden;}
+.row{display:flex;align-items:center;}
+.col{display:flex;flex-direction:column;}
+.spacer{flex:1;}
+
+/* ---------- 屏幕1 首页 ---------- */
+#s-home{background:var(--bg);}
+.greet{font-size:28px;font-weight:700;color:var(--ink);line-height:1.25;}
+.date-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.date-txt{font-size:14px;font-weight:500;color:var(--gray);}
+.pts-chip{height:44px;padding:0 18px;border-radius:22px;background:var(--cream);display:flex;align-items:center;gap:7px;}
+.pts-txt{font-size:16px;font-weight:700;color:var(--gold-ink);}
+
+.hero{display:flex;align-items:center;gap:20px;padding:22px;border-radius:24px;
+  background:linear-gradient(135deg,#6BB8F0 0%,#3D8FD6 100%);box-shadow:var(--sh-hero);}
+.hero-sheep{width:180px;height:180px;flex:none;object-fit:contain;}
+.hero-info{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0;}
+.hero-label{font-size:14px;font-weight:500;color:#DCEFFD;}
+.hero-num{font-size:42px;font-weight:700;color:#FFFFFF;line-height:1;}
+.hero-den{font-size:18px;font-weight:500;color:#CFE6FA;}
+.bar{height:14px;border-radius:7px;background:rgba(255,255,255,.28);overflow:hidden;}
+.bar-fill{height:100%;width:75%;border-radius:7px;background:#FFD66B;transition:width .6s ease;}
+.hero-cap{font-size:14px;font-weight:500;color:#DCEFFD;}
+
+.sec-head{display:flex;align-items:center;justify-content:space-between;}
+.sec-title{font-size:22px;font-weight:700;color:var(--ink);}
+.sec-count{font-size:14px;font-weight:500;color:var(--gray);}
+.task-list{display:flex;flex-direction:column;gap:14px;}
+
+.task-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);}
+.tile{width:52px;height:52px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;}
+.task-info{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
+.task-name{font-size:17px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.task-meta{display:flex;align-items:center;gap:10px;}
+.pill{height:26px;padding:0 10px;border-radius:13px;display:inline-flex;align-items:center;font-size:12px;font-weight:500;}
+.task-pts{font-size:15px;font-weight:700;color:var(--gold);}
+.btn-check{height:44px;padding:0 20px;border-radius:22px;flex:none;display:flex;align-items:center;justify-content:center;
+  gap:6px;font-size:15px;font-weight:600;color:#FFFFFF;background:var(--blue);box-shadow:var(--sh-btn);
+  border:none;cursor:pointer;font-family:inherit;transition:transform .12s ease;}
+.btn-check:active{transform:scale(.96);}
+.btn-done{height:44px;padding:0 18px;border-radius:22px;flex:none;display:flex;align-items:center;gap:6px;
+  font-size:15px;font-weight:600;}
+
+/* ---------- 底部导航 ---------- */
+.navwrap{height:96px;flex:none;padding:12px;}
+.navpill{width:100%;height:72px;border-radius:36px;background:var(--card);border:1px solid var(--line);
+  padding:6px;display:flex;align-items:center;gap:6px;box-shadow:var(--sh-nav);}
+.tab{flex:1;height:100%;border-radius:30px;display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;border:none;background:transparent;font-family:inherit;transition:background .18s ease;}
+.tab span{font-size:16px;font-weight:500;color:var(--gray);}
+.tab.active{background:var(--blue);}
+.tab.active span{font-weight:600;color:#FFFFFF;}
+.tab svg{display:block;}
+
+/* ---------- 屏幕2 计划 ---------- */
+#s-plan{background:var(--bg);}
+.page-title{font-size:28px;font-weight:700;color:var(--ink);line-height:1.25;}
+.page-sub{font-size:14px;font-weight:500;color:var(--gray);margin-top:8px;}
+.head-sheep{width:120px;height:120px;flex:none;object-fit:contain;}
+.step-label{font-size:15px;font-weight:600;color:var(--ink);}
+.week-card{display:flex;align-items:center;gap:16px;padding:20px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);}
+.week-tile{width:46px;height:46px;border-radius:14px;background:var(--blue-soft);flex:none;display:flex;align-items:center;justify-content:center;}
+.week-title{font-size:17px;font-weight:600;color:var(--ink);}
+.week-sub{font-size:13px;font-weight:500;color:var(--gray);margin-top:5px;}
+.chips{display:flex;gap:10px;flex-wrap:wrap;}
+.chip{height:40px;padding:0 16px;border-radius:20px;background:var(--card);border:1px solid var(--line);
+  display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:var(--gray-2);cursor:pointer;
+  font-family:inherit;transition:all .16s ease;}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#FFFFFF;font-weight:600;}
+.diff-row{display:flex;gap:12px;}
+.diff{flex:1;padding:16px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  cursor:pointer;transition:all .16s ease;}
+.diff-name{font-size:16px;font-weight:700;}
+.diff-pts{font-size:13px;font-weight:500;}
+.form-card{padding:18px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);display:flex;flex-direction:column;gap:12px;}
+.form-label{font-size:15px;font-weight:600;color:var(--ink);}
+.input{height:52px;padding:0 16px;border-radius:14px;background:var(--field);display:flex;align-items:center;
+  font-size:15px;color:var(--gray-3);}
+.selector{flex:1;height:48px;padding:0 16px;border-radius:14px;background:var(--field);display:flex;
+  align-items:center;justify-content:space-between;font-size:14px;}
+.add-btn{height:48px;padding:0 22px;border-radius:14px;background:#FFC94D;display:flex;align-items:center;
+  justify-content:center;font-size:15px;font-weight:700;color:#6B4A00;box-shadow:var(--sh-gold);
+  border:none;cursor:pointer;font-family:inherit;}
+.plan-row{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--card);box-shadow:var(--sh-card);}
+.day-badge{height:30px;padding:0 10px;border-radius:10px;display:inline-flex;align-items:center;font-size:12px;font-weight:500;flex:none;}
+.plan-name{flex:1;font-size:15px;font-weight:500;color:var(--ink);}
+.plan-pts{font-size:14px;font-weight:700;color:var(--gold);}
+.cta{height:56px;border-radius:28px;background:var(--blue);display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:600;color:#FFFFFF;box-shadow:var(--sh-cta);border:none;cursor:pointer;font-family:inherit;}
+
+/* ---------- 屏幕3 庆祝 ---------- */
+#s-party{background:var(--bg-party);display:none;}
+#s-party.active{display:flex;}
+.confetti{position:absolute;}
+.party-wrap{flex:1;padding:40px;display:flex;flex-direction:column;align-items:center;gap:22px;overflow:hidden;}
+.party-card{width:100%;padding:36px;border-radius:28px;background:var(--card);box-shadow:var(--sh-party);
+  display:flex;flex-direction:column;align-items:center;gap:16px;animation:pop .34s cubic-bezier(.2,.9,.3,1.2);}
+@keyframes pop{from{opacity:0;transform:scale(.9) translateY(14px);}to{opacity:1;transform:none;}}
+.party-sheep{width:230px;height:230px;object-fit:contain;}
+.party-big{font-size:34px;font-weight:700;color:var(--ink);}
+.party-sub{font-size:16px;font-weight:500;color:var(--gray);}
+.balance{height:44px;padding:0 18px;border-radius:22px;background:var(--cream);display:flex;align-items:center;gap:8px;}
+.balance span{font-size:15px;font-weight:700;color:var(--gold-ink);}
+.streak-card{width:100%;display:flex;align-items:center;gap:14px;padding:20px;border-radius:20px;background:var(--card);box-shadow:0 6px 16px -4px rgba(140,102,26,.10);}
+.flame-tile{width:48px;height:48px;border-radius:24px;background:#FDEBCE;flex:none;display:flex;align-items:center;justify-content:center;}
+.streak-title{font-size:17px;font-weight:600;color:var(--ink);}
+.streak-sub{font-size:13px;font-weight:500;color:var(--gray);margin-top:5px;}
+.streak-badge{height:32px;padding:0 12px;border-radius:16px;background:#FDEBCE;display:inline-flex;align-items:center;
+  font-size:13px;font-weight:700;color:#C77700;flex:none;}
+.btn-row{display:flex;gap:14px;width:100%;}
+.btn-primary{flex:1;height:56px;border-radius:28px;background:var(--blue);display:flex;align-items:center;
+  justify-content:center;font-size:17px;font-weight:600;color:#FFFFFF;box-shadow:var(--sh-cta);border:none;cursor:pointer;font-family:inherit;}
+.btn-ghost{flex:1;height:56px;border-radius:28px;background:var(--card);border:1px solid var(--line);display:flex;
+  align-items:center;justify-content:center;font-size:17px;font-weight:600;color:var(--gray-2);cursor:pointer;font-family:inherit;}
+
+/* ---------- 屏幕4 商城 ---------- */
+#s-shop{background:var(--bg);}
+.balance-banner{display:flex;align-items:center;gap:16px;padding:20px;border-radius:20px;background:var(--cream);}
+.coin-tile{width:48px;height:48px;border-radius:24px;background:#FFE3A0;flex:none;display:flex;align-items:center;justify-content:center;}
+.bal-num{font-size:22px;font-weight:700;color:var(--gold-ink);}
+.bal-sub{font-size:13px;font-weight:500;color:#B08A45;margin-top:4px;}
+.grid{display:grid;grid-template-columns:375px 375px;gap:14px;}
+.reward{padding:18px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);display:flex;flex-direction:column;gap:12px;}
+.reward-tile{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;}
+.reward-name{font-size:16px;font-weight:600;color:var(--ink);}
+.reward-row{display:flex;align-items:center;justify-content:space-between;}
+.reward-price{font-size:15px;font-weight:700;color:var(--gold);}
+.btn-buy{height:36px;padding:0 16px;border-radius:18px;background:var(--blue);display:inline-flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:600;color:#FFFFFF;border:none;cursor:pointer;font-family:inherit;transition:all .16s ease;}
+.btn-buy.locked{background:var(--muted);color:var(--gray-3);cursor:not-allowed;}
+.btn-buy.used{background:var(--green-soft);color:var(--green);cursor:default;}
+
+/* ---------- 屏幕5 家长 ---------- */
+#s-parent{background:var(--bg-parent);}
+.parent-sheep{width:110px;height:110px;flex:none;object-fit:contain;}
+.lock-chip{height:36px;padding:0 14px;border-radius:18px;background:var(--green-soft);display:flex;align-items:center;gap:6px;flex:none;}
+.lock-txt{font-size:13px;font-weight:600;color:var(--green);}
+.stats{display:flex;gap:14px;}
+.stat{flex:1;padding:18px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);display:flex;flex-direction:column;gap:6px;}
+.stat-v{font-size:26px;font-weight:700;}
+.stat-l{font-size:13px;font-weight:500;color:var(--gray);}
+.panel{padding:20px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);display:flex;flex-direction:column;gap:14px;}
+.panel-title{font-size:18px;font-weight:600;color:var(--ink);}
+.badge-count{height:26px;padding:0 10px;border-radius:13px;background:var(--coral-soft);display:inline-flex;align-items:center;
+  font-size:12px;font-weight:700;color:var(--coral);}
+.cf-row{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--row);transition:opacity .25s ease;}
+.cf-name{font-size:15px;font-weight:500;color:var(--ink);}
+.cf-time{font-size:12px;font-weight:400;color:var(--gray);margin-top:4px;}
+.btn-ok{height:38px;padding:0 16px;border-radius:19px;background:var(--green-2);display:inline-flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:600;color:#FFFFFF;border:none;cursor:pointer;font-family:inherit;}
+.btn-no{height:38px;padding:0 16px;border-radius:19px;background:var(--card);border:1px solid var(--line);
+  display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;font-family:inherit;}
+.mgmt{display:flex;gap:14px;}
+.entry{flex:1;padding:16px;border-radius:20px;background:var(--card);box-shadow:var(--sh-card);display:flex;
+  flex-direction:column;align-items:center;gap:10px;cursor:pointer;}
+.entry-tile{width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;}
+.entry-label{font-size:14px;font-weight:600;color:var(--ink);}
+.note{font-size:12px;font-weight:400;color:var(--gray-3);text-align:center;line-height:1.5;}
+
+.toast{position:absolute;left:50%;bottom:132px;transform:translateX(-50%) translateY(10px);
+  background:rgba(46,66,87,.94);color:#fff;font-size:15px;font-weight:500;padding:12px 22px;border-radius:22px;
+  opacity:0;pointer-events:none;transition:all .25s ease;z-index:60;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ================= iOS / iPadOS 原生壳适配 ================= */
+html,body{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent;
+}
+body.ios{
+  background:#0F1720;
+  align-items:stretch;
+  /* iOS 无 Noto Sans SC 时回退苹方，字形与字重层级保持一致 */
+  font-family:"PingFang SC","Noto Sans SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+body.ios .stage{align-items:stretch;justify-content:stretch;}
+body.ios .device{
+  width:100%;height:100%;border-radius:0;box-shadow:none;transform:none !important;
+}
+body.ios .screen{overscroll-behavior:contain;}
+/* 设计稿状态栏 62px 中已含约 24px 系统状态栏区，此处用安全区精确补偿 */
+body.ios .statusbar{
+  height:calc(38px + env(safe-area-inset-top));
+  padding-top:env(safe-area-inset-top);
+  padding-left:max(28px, env(safe-area-inset-left));
+  padding-right:max(28px, env(safe-area-inset-right));
+}
+/* 内容区在真实 iPad 高度不足 1180 时允许纵向滚动 */
+body.ios .content{
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  padding-left:max(28px, env(safe-area-inset-left));
+  padding-right:max(28px, env(safe-area-inset-right));
+}
+body.ios .navwrap{
+  height:auto;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom));
+  padding-left:max(12px, env(safe-area-inset-left));
+  padding-right:max(12px, env(safe-area-inset-right));
+  padding-top:12px;
+}
+body.ios .toast{bottom:calc(132px + env(safe-area-inset-bottom));}
+/* 隐藏滚动条，保持设计稿干净观感 */
+body.ios ::-webkit-scrollbar{width:0;height:0;}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="device" id="device">
+
+  <!-- ============ 屏幕1 · 首页 ============ -->
+  <section class="screen active" id="s-home">
+    <div class="statusbar">
+      <div class="sb-time">9:41</div>
+      <div class="sb-icons">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect x="0" y="7" width="3" height="5" rx="1" fill="#2E4257"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#2E4257"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#2E4257"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#2E4257" opacity=".35"/></svg>
+        <svg width="17" height="13" viewBox="0 0 17 13" fill="none"><circle cx="8.5" cy="11" r="1.6" fill="#2E4257"/><path d="M2 5.5C3.8 3.9 6 3 8.5 3s4.7.9 6.5 2.5" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 8C5.6 7 7 6.5 8.5 6.5S11.4 7 12.5 8" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#2E4257" opacity=".4"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.5" fill="#2E4257"/><path d="M23.5 4v4c1.2-.3 2-1 2-2s-.8-1.7-2-2z" fill="#2E4257" opacity=".4"/></svg>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="row">
+        <div class="col spacer">
+          <div class="greet">下午好，小咩！</div>
+          <div class="date-row">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="12" rx="2.5" stroke="#8296A9" stroke-width="1.6"/><path d="M1.5 6.5h13" stroke="#8296A9" stroke-width="1.6"/><path d="M5 1v3M11 1v3" stroke="#8296A9" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <div class="date-txt">9月17日 星期四 · 连续打卡 7 天</div>
+          </div>
+        </div>
+        <div class="pts-chip">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5l2.2 4.7 5.1.7-3.7 3.6.9 5.2L9 13.2l-4.5 2.5.9-5.2L1.7 6.9l5.1-.7z" fill="#E8A317"/></svg>
+          <div class="pts-txt" id="pts-home">1,280 积分</div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <img class="hero-sheep" src="assets/sheep-wave.png" alt="咩咩学小羊" />
+        <div class="hero-info">
+          <div class="hero-label">本周学习目标</div>
+          <div class="row" style="gap:6px;align-items:baseline;">
+            <div class="hero-num" id="week-got">210</div>
+            <div class="hero-den">/ 280 分</div>
+          </div>
+          <div class="bar"><div class="bar-fill" id="week-bar"></div></div>
+          <div class="hero-cap" id="week-cap">还差 70 分即可解锁「游乐园一日游」</div>
+        </div>
+      </div>
+
+      <div class="sec-head">
+        <div class="sec-title">今日任务</div>
+        <div class="sec-count" id="task-count">共 4 项 · 已完成 1 项</div>
+      </div>
+
+      <div class="task-list" id="task-list">
+        <div class="task-card" data-pts="10" data-name="数学口算 50 题">
+          <div class="tile" style="background:#E2F4EA;">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><rect x="4" y="2" width="18" height="22" rx="3" stroke="#3E9A6C" stroke-width="2"/><path d="M8 7.5h10" stroke="#3E9A6C" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1.4" fill="#3E9A6C"/><circle cx="17" cy="13" r="1.4" fill="#3E9A6C"/><circle cx="9" cy="18.5" r="1.4" fill="#3E9A6C"/><circle cx="17" cy="18.5" r="1.4" fill="#3E9A6C"/></svg>
+          </div>
+          <div class="task-info">
+            <div class="task-name">数学口算 50 题</div>
+            <div class="task-meta">
+              <div class="pill" style="background:#E2F4EA;color:#3E9A6C;">简单</div>
+              <div class="task-pts">+10 分</div>
+            </div>
+          </div>
+          <div class="btn-done" style="background:#E2F4EA;color:#3E9A6C;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 8.5l3.5 3.5 7.5-8" stroke="#3E9A6C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>已完成
+          </div>
+        </div>
+
+        <div class="task-card" data-pts="20" data-name="背诵英语单词 20 个">
+          <div class="tile" style="background:#FDF1DA;">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M3 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 5V5z" fill="#F0B445"/><circle cx="9.5" cy="10" r="1.5" fill="#fff"/><circle cx="13.5" cy="10" r="1.5" fill="#fff"/><circle cx="17.5" cy="10" r="1.5" fill="#fff"/></svg>
+          </div>
+          <div class="task-info">
+            <div class="task-name">背诵英语单词 20 个</div>
+            <div class="task-meta">
+              <div class="pill" style="background:#FDF1DA;color:#C97F12;">中等</div>
+              <div class="task-pts">+20 分</div>
+            </div>
+          </div>
+          <button class="btn-check">打卡</button>
+        </div>
+
+        <div class="task-card" data-pts="15" data-name="阅读《城南旧事》30 分钟">
+          <div class="tile" style="background:#E1F0FC;">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 6c-2-1.6-4.8-2-8-2v16c3.2 0 6 .4 8 2 2-1.6 4.8-2 8-2V4c-3.2 0-6 .4-8 2z" stroke="#3F97E3" stroke-width="2" stroke-linejoin="round"/><path d="M13 6v16" stroke="#3F97E3" stroke-width="2"/></svg>
+          </div>
+          <div class="task-info">
+            <div class="task-name">阅读《城南旧事》30 分钟</div>
+            <div class="task-meta">
+              <div class="pill" style="background:#FDF1DA;color:#C97F12;">中等</div>
+              <div class="task-pts">+15 分</div>
+            </div>
+          </div>
+          <button class="btn-check">打卡</button>
+        </div>
+
+        <div class="task-card" data-pts="30" data-name="练习毛笔字 1 页">
+          <div class="tile" style="background:#FCE8E4;">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M16.5 3.5l6 6L11 21H5v-6z" stroke="#E06A55" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l6 6" stroke="#E06A55" stroke-width="2"/></svg>
+          </div>
+          <div class="task-info">
+            <div class="task-name">练习毛笔字 1 页</div>
+            <div class="task-meta">
+              <div class="pill" style="background:#FCE8E4;color:#E06A55;">挑战</div>
+              <div class="task-pts">+30 分</div>
+            </div>
+          </div>
+          <button class="btn-check">打卡</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="navwrap">
+      <div class="navpill">
+        <button class="tab active" data-go="home">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 0 1-1 1h-4v-4.5H8V18H4a1 1 0 0 1-1-1z" fill="#FFFFFF"/></svg>
+          <span>今日</span>
+        </button>
+        <button class="tab" data-go="plan">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="2.5" stroke="#8296A9" stroke-width="1.8"/><path d="M2.5 8h15" stroke="#8296A9" stroke-width="1.8"/><path d="M6.5 2v3.5M13.5 2v3.5" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>计划</span>
+        </button>
+        <button class="tab" data-go="shop">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="7" width="15" height="3.5" rx="1" stroke="#8296A9" stroke-width="1.7"/><path d="M4 10.5h12V16a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16z" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7v10.5" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7C8.2 7 6.5 6 6.5 4.4 6.5 3 8.8 2.6 10 7c1.2-4.4 3.5-4 3.5-2.6C13.5 6 11.8 7 10 7z" stroke="#8296A9" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>奖励</span>
+        </button>
+        <button class="tab" data-go="parent">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M10 2l7 3v5c0 4.2-3 7-7 8.5C6 17 3 14.2 3 10V5z" stroke="#8296A9" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.2 10l2 2 3.6-4" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>家长</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 屏幕2 · 制定学习计划 ============ -->
+  <section class="screen" id="s-plan">
+    <div class="statusbar">
+      <div class="sb-time">9:41</div>
+      <div class="sb-icons">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect x="0" y="7" width="3" height="5" rx="1" fill="#2E4257"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#2E4257"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#2E4257"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#2E4257" opacity=".35"/></svg>
+        <svg width="17" height="13" viewBox="0 0 17 13" fill="none"><circle cx="8.5" cy="11" r="1.6" fill="#2E4257"/><path d="M2 5.5C3.8 3.9 6 3 8.5 3s4.7.9 6.5 2.5" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 8C5.6 7 7 6.5 8.5 6.5S11.4 7 12.5 8" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#2E4257" opacity=".4"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.5" fill="#2E4257"/><path d="M23.5 4v4c1.2-.3 2-1 2-2s-.8-1.7-2-2z" fill="#2E4257" opacity=".4"/></svg>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="row" style="gap:16px;">
+        <div class="col spacer">
+          <div class="page-title">制定学习计划</div>
+          <div class="page-sub">和爸爸妈妈一起，规划这一周的小目标</div>
+        </div>
+        <img class="head-sheep" src="assets/sheep-read.png" alt="" />
+      </div>
+
+      <div class="week-card">
+        <div class="week-tile">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="19" height="17" rx="3" stroke="#3F97E3" stroke-width="2"/><path d="M2.5 9h19" stroke="#3F97E3" stroke-width="2"/><path d="M8 2v4M16 2v4" stroke="#3F97E3" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="col spacer">
+          <div class="week-title">第 3 周 · 9月14日 - 9月20日</div>
+          <div class="week-sub">已排 8 项任务 · 完成后预计可得 280 积分</div>
+        </div>
+      </div>
+
+      <div class="step-label">第一步 · 选择任务分类</div>
+      <div class="chips">
+        <button class="chip">语文</button>
+        <button class="chip on">数学</button>
+        <button class="chip">英语</button>
+        <button class="chip">阅读</button>
+        <button class="chip">运动</button>
+        <button class="chip">才艺</button>
+      </div>
+
+      <div class="step-label">第二步 · 选择难度与积分</div>
+      <div class="diff-row">
+        <div class="diff" style="background:#E1F0FC;border:2px solid #3F97E3;">
+          <div class="diff-name" style="color:#2E7CC0;">简单</div>
+          <div class="diff-pts" style="color:#4C8FC4;">+10 分/项</div>
+        </div>
+        <div class="diff" style="background:#FFFFFF;border:1px solid #D8E6F2;">
+          <div class="diff-name" style="color:#C97F12;">中等</div>
+          <div class="diff-pts" style="color:#B08A45;">+20 分/项</div>
+        </div>
+        <div class="diff" style="background:#FFFFFF;border:1px solid #D8E6F2;">
+          <div class="diff-name" style="color:#E06A55;">挑战</div>
+          <div class="diff-pts" style="color:#C98A7D;">+30 分/项</div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-label">添加新任务</div>
+        <div class="input">任务名称，例如：口算练习 50 题</div>
+        <div class="row" style="gap:12px;">
+          <div class="selector"><span style="color:#5C7186;">预计时长</span><span style="font-weight:600;color:#2E4257;">20 分钟</span></div>
+          <button class="add-btn">添加任务</button>
+        </div>
+      </div>
+
+      <div class="step-label">已排入本周计划</div>
+      <div class="plan-row">
+        <div class="day-badge" style="background:#E1F0FC;color:#2E7CC0;">周一</div>
+        <div class="plan-name">口算练习 50 题</div>
+        <div class="plan-pts">+10 分</div>
+      </div>
+      <div class="plan-row">
+        <div class="day-badge" style="background:#FCE8E4;color:#E06A55;">周三</div>
+        <div class="plan-name">奥数思维题 10 道</div>
+        <div class="plan-pts">+30 分</div>
+      </div>
+
+      <button class="cta" style="margin-top:auto;">保存本周计划</button>
+    </div>
+
+    <div class="navwrap">
+      <div class="navpill">
+        <button class="tab" data-go="home">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 0 1-1 1h-4v-4.5H8V18H4a1 1 0 0 1-1-1z" fill="#8296A9"/></svg>
+          <span>今日</span>
+        </button>
+        <button class="tab active" data-go="plan">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="2.5" stroke="#FFFFFF" stroke-width="1.8"/><path d="M2.5 8h15" stroke="#FFFFFF" stroke-width="1.8"/><path d="M6.5 2v3.5M13.5 2v3.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>计划</span>
+        </button>
+        <button class="tab" data-go="shop">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="7" width="15" height="3.5" rx="1" stroke="#8296A9" stroke-width="1.7"/><path d="M4 10.5h12V16a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16z" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7v10.5" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7C8.2 7 6.5 6 6.5 4.4 6.5 3 8.8 2.6 10 7c1.2-4.4 3.5-4 3.5-2.6C13.5 6 11.8 7 10 7z" stroke="#8296A9" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>奖励</span>
+        </button>
+        <button class="tab" data-go="parent">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M10 2l7 3v5c0 4.2-3 7-7 8.5C6 17 3 14.2 3 10V5z" stroke="#8296A9" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.2 10l2 2 3.6-4" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>家长</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 屏幕4 · 咩咩商城 ============ -->
+  <section class="screen" id="s-shop">
+    <div class="statusbar">
+      <div class="sb-time">9:41</div>
+      <div class="sb-icons">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect x="0" y="7" width="3" height="5" rx="1" fill="#2E4257"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#2E4257"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#2E4257"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#2E4257" opacity=".35"/></svg>
+        <svg width="17" height="13" viewBox="0 0 17 13" fill="none"><circle cx="8.5" cy="11" r="1.6" fill="#2E4257"/><path d="M2 5.5C3.8 3.9 6 3 8.5 3s4.7.9 6.5 2.5" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 8C5.6 7 7 6.5 8.5 6.5S11.4 7 12.5 8" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#2E4257" opacity=".4"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.5" fill="#2E4257"/><path d="M23.5 4v4c1.2-.3 2-1 2-2s-.8-1.7-2-2z" fill="#2E4257" opacity=".4"/></svg>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="row" style="gap:16px;">
+        <div class="col spacer">
+          <div class="page-title">咩咩商城</div>
+          <div class="page-sub">奖励由爸爸妈妈上架，攒够积分就能兑换</div>
+        </div>
+        <img class="head-sheep" src="assets/sheep-gift.png" alt="" />
+      </div>
+
+      <div class="balance-banner">
+        <div class="coin-tile">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="10.5" fill="#E8A317"/><circle cx="13" cy="13" r="6.8" stroke="#FFF3D2" stroke-width="2"/></svg>
+        </div>
+        <div class="col spacer">
+          <div class="bal-num" id="pts-shop">1,280 积分</div>
+          <div class="bal-sub">本月已成功兑换 5 件奖励</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="reward">
+          <div class="reward-tile" style="background:#E1F0FC;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="3" y="7" width="26" height="17" rx="3" stroke="#3F97E3" stroke-width="2.2"/><path d="M12 27h8" stroke="#3F97E3" stroke-width="2.2" stroke-linecap="round"/><path d="M14 12l6 3.5-6 3.5z" fill="#3F97E3"/></svg>
+          </div>
+          <div class="reward-name">看一集动画片</div>
+          <div class="reward-row">
+            <div class="reward-price">100 积分</div>
+            <button class="btn-buy" data-price="100" data-title="看一集动画片">去兑换</button>
+          </div>
+        </div>
+
+        <div class="reward">
+          <div class="reward-tile" style="background:#FDE7EF;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="12" r="8" fill="#E0709B"/><circle cx="12" cy="9" r="3" fill="#F5A6B8"/><path d="M10.5 17.5L16 29l5.5-11.5" stroke="#D99A4E" stroke-width="2.2" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="reward-name">冰淇淋一个</div>
+          <div class="reward-row">
+            <div class="reward-price">50 积分</div>
+            <button class="btn-buy" data-price="50" data-title="冰淇淋一个">去兑换</button>
+          </div>
+        </div>
+
+        <div class="reward">
+          <div class="reward-tile" style="background:#FDF1DA;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 7c-2.2-1.7-5.2-2-8.5-2v19c3.3 0 6.3.3 8.5 2 2.2-1.7 5.2-2 8.5-2V5c-3.3 0-6.3.3-8.5 2z" stroke="#E8A317" stroke-width="2.2" stroke-linejoin="round"/><path d="M16 7v19" stroke="#E8A317" stroke-width="2.2"/></svg>
+          </div>
+          <div class="reward-name">新漫画书一本</div>
+          <div class="reward-row">
+            <div class="reward-price">300 积分</div>
+            <button class="btn-buy" data-price="300" data-title="新漫画书一本">去兑换</button>
+          </div>
+        </div>
+
+        <div class="reward">
+          <div class="reward-tile" style="background:#E2F4EA;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><ellipse cx="9" cy="11" rx="3.2" ry="4" fill="#4CAF87"/><ellipse cx="23" cy="11" rx="3.2" ry="4" fill="#4CAF87"/><ellipse cx="14.5" cy="7.5" rx="3" ry="3.8" fill="#4CAF87"/><ellipse cx="17.5" cy="7.5" rx="3" ry="3.8" fill="#4CAF87"/><path d="M16 14c4.5 0 8 3.4 8 7 0 2.8-2.2 4.5-5 4.5-1.2 0-2.1-.4-3-.4s-1.8.4-3 .4c-2.8 0-5-1.7-5-4.5 0-3.6 3.5-7 8-7z" fill="#4CAF87"/></svg>
+          </div>
+          <div class="reward-name">周末去动物园</div>
+          <div class="reward-row">
+            <div class="reward-price">500 积分</div>
+            <button class="btn-buy" data-price="500" data-title="周末去动物园">去兑换</button>
+          </div>
+        </div>
+
+        <div class="reward">
+          <div class="reward-tile" style="background:#FCE8E4;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="13" r="9" stroke="#EF7463" stroke-width="2.2"/><circle cx="16" cy="4.5" r="2" fill="#EF7463"/><circle cx="24.5" cy="13" r="2" fill="#EF7463"/><circle cx="7.5" cy="13" r="2" fill="#EF7463"/><circle cx="21.8" cy="7.2" r="2" fill="#EF7463"/><circle cx="10.2" cy="7.2" r="2" fill="#EF7463"/><circle cx="21.8" cy="18.8" r="2" fill="#EF7463"/><circle cx="10.2" cy="18.8" r="2" fill="#EF7463"/><path d="M16 13v2M16 15l6 13M16 15l-6 13" stroke="#EF7463" stroke-width="2.2"/></svg>
+          </div>
+          <div class="reward-name">游乐园一日游</div>
+          <div class="reward-row">
+            <div class="reward-price">1,000 积分</div>
+            <button class="btn-buy locked" disabled>攒积分中</button>
+          </div>
+        </div>
+
+        <div class="reward">
+          <div class="reward-tile" style="background:#EDE7FA;">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M25 18.5A11 11 0 1 1 13.5 5a9 9 0 0 0 11.5 13.5z" fill="#8B72D9"/><path d="M24 5.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#E8A317"/></svg>
+          </div>
+          <div class="reward-name">睡前多听一个故事</div>
+          <div class="reward-row">
+            <div class="reward-price">80 积分</div>
+            <button class="btn-buy" data-price="80" data-title="睡前多听一个故事">去兑换</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="navwrap">
+      <div class="navpill">
+        <button class="tab" data-go="home">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 0 1-1 1h-4v-4.5H8V18H4a1 1 0 0 1-1-1z" fill="#8296A9"/></svg>
+          <span>今日</span>
+        </button>
+        <button class="tab" data-go="plan">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="2.5" stroke="#8296A9" stroke-width="1.8"/><path d="M2.5 8h15" stroke="#8296A9" stroke-width="1.8"/><path d="M6.5 2v3.5M13.5 2v3.5" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>计划</span>
+        </button>
+        <button class="tab active" data-go="shop">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="7" width="15" height="3.5" rx="1" stroke="#FFFFFF" stroke-width="1.7"/><path d="M4 10.5h12V16a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16z" stroke="#FFFFFF" stroke-width="1.7"/><path d="M10 7v10.5" stroke="#FFFFFF" stroke-width="1.7"/><path d="M10 7C8.2 7 6.5 6 6.5 4.4 6.5 3 8.8 2.6 10 7c1.2-4.4 3.5-4 3.5-2.6C13.5 6 11.8 7 10 7z" stroke="#FFFFFF" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>奖励</span>
+        </button>
+        <button class="tab" data-go="parent">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M10 2l7 3v5c0 4.2-3 7-7 8.5C6 17 3 14.2 3 10V5z" stroke="#8296A9" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.2 10l2 2 3.6-4" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>家长</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 屏幕5 · 家长中心 ============ -->
+  <section class="screen" id="s-parent">
+    <div class="statusbar">
+      <div class="sb-time">9:41</div>
+      <div class="sb-icons">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect x="0" y="7" width="3" height="5" rx="1" fill="#2E4257"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#2E4257"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#2E4257"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#2E4257" opacity=".35"/></svg>
+        <svg width="17" height="13" viewBox="0 0 17 13" fill="none"><circle cx="8.5" cy="11" r="1.6" fill="#2E4257"/><path d="M2 5.5C3.8 3.9 6 3 8.5 3s4.7.9 6.5 2.5" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 8C5.6 7 7 6.5 8.5 6.5S11.4 7 12.5 8" stroke="#2E4257" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#2E4257" opacity=".4"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.5" fill="#2E4257"/><path d="M23.5 4v4c1.2-.3 2-1 2-2s-.8-1.7-2-2z" fill="#2E4257" opacity=".4"/></svg>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="row" style="gap:16px;">
+        <img class="parent-sheep" src="assets/sheep-parent.png" alt="" />
+        <div class="col spacer">
+          <div class="page-title">家长中心</div>
+          <div class="page-sub">密码验证已通过 · 管理小咩的学习计划与奖励</div>
+        </div>
+        <div class="lock-chip">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="6" width="10" height="7" rx="2" fill="#3E9A6C"/><path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#3E9A6C" stroke-width="1.8"/></svg>
+          <div class="lock-txt">已解锁</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-v" style="color:#3F97E3;">82%</div>
+          <div class="stat-l">本周任务完成率</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v" style="color:#E8A317;">210 分</div>
+          <div class="stat-l">本周获得积分</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v" style="color:#4CAF87;">7 天</div>
+          <div class="stat-l">连续打卡天数</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <div class="panel-title">待确认打卡</div>
+          <div class="badge-count" id="pending-badge">2 项待审核</div>
+        </div>
+
+        <div class="cf-row" data-pending>
+          <div class="col spacer">
+            <div class="cf-name">数学口算 50 题</div>
+            <div class="cf-time">今天 16:42 打卡 · 附 1 张照片</div>
+          </div>
+          <button class="btn-ok">通过</button>
+          <button class="btn-no">退回</button>
+        </div>
+
+        <div class="cf-row" data-pending>
+          <div class="col spacer">
+            <div class="cf-name">阅读《城南旧事》30 分钟</div>
+            <div class="cf-time">今天 19:05 打卡 · 语音记录 28 分钟</div>
+          </div>
+          <button class="btn-ok">通过</button>
+          <button class="btn-no">退回</button>
+        </div>
+
+        <div class="cf-row" id="pending-empty" style="display:none;justify-content:center;color:#9FB2C4;font-size:14px;">
+          全部打卡已审核完毕 🎉
+        </div>
+      </div>
+
+      <div class="mgmt">
+        <div class="entry">
+          <div class="entry-tile" style="background:#FFF3D2;">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2.5" y="8" width="17" height="4" rx="1" stroke="#C97F12" stroke-width="1.8"/><path d="M4 12h14v6.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5z" stroke="#C97F12" stroke-width="1.8"/><path d="M11 8v12" stroke="#C97F12" stroke-width="1.8"/><path d="M11 8C9 8 7 7 7 5.2 7 3.8 9.5 3.4 11 8c1.5-4.6 4-4.2 4-2.8C15 7 13 8 11 8z" stroke="#C97F12" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="entry-label">上架新奖励</div>
+        </div>
+        <div class="entry">
+          <div class="entry-tile" style="background:#E1F0FC;">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 6.5h16M3 15.5h16" stroke="#3F97E3" stroke-width="2" stroke-linecap="round"/><circle cx="14" cy="6.5" r="3" fill="#FFFFFF" stroke="#3F97E3" stroke-width="2"/><circle cx="8" cy="15.5" r="3" fill="#FFFFFF" stroke="#3F97E3" stroke-width="2"/></svg>
+          </div>
+          <div class="entry-label">调整积分规则</div>
+        </div>
+        <div class="entry">
+          <div class="entry-tile" style="background:#E2F4EA;">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.5" stroke="#3E9A6C" stroke-width="2"/><path d="M11 6.5V11l3 2.5" stroke="#3E9A6C" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="entry-label">设置使用时长</div>
+        </div>
+      </div>
+
+      <div class="note">安全提示：家长模式每次进入均需输入 6 位密码，防止孩子自行修改积分与奖励</div>
+    </div>
+
+    <div class="navwrap">
+      <div class="navpill">
+        <button class="tab" data-go="home">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3l7 6.5V17a1 1 0 0 1-1 1h-4v-4.5H8V18H4a1 1 0 0 1-1-1z" fill="#8296A9"/></svg>
+          <span>今日</span>
+        </button>
+        <button class="tab" data-go="plan">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="13.5" rx="2.5" stroke="#8296A9" stroke-width="1.8"/><path d="M2.5 8h15" stroke="#8296A9" stroke-width="1.8"/><path d="M6.5 2v3.5M13.5 2v3.5" stroke="#8296A9" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>计划</span>
+        </button>
+        <button class="tab" data-go="shop">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="7" width="15" height="3.5" rx="1" stroke="#8296A9" stroke-width="1.7"/><path d="M4 10.5h12V16a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16z" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7v10.5" stroke="#8296A9" stroke-width="1.7"/><path d="M10 7C8.2 7 6.5 6 6.5 4.4 6.5 3 8.8 2.6 10 7c1.2-4.4 3.5-4 3.5-2.6C13.5 6 11.8 7 10 7z" stroke="#8296A9" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>奖励</span>
+        </button>
+        <button class="tab active" data-go="parent">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M10 2l7 3v5c0 4.2-3 7-7 8.5C6 17 3 14.2 3 10V5z" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.2 10l2 2 3.6-4" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>家长</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 屏幕3 · 打卡成功（覆盖层） ============ -->
+  <section class="screen" id="s-party" style="z-index:40;">
+    <svg class="confetti" style="left:90px;top:150px;" width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" transform="rotate(20 8 8)" fill="#FFC94D"/></svg>
+    <svg class="confetti" style="left:700px;top:130px;" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#7EC3F0"/></svg>
+    <svg class="confetti" style="left:130px;top:880px;" width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="3" transform="rotate(-15 9 9)" fill="#F5A6B8"/></svg>
+    <svg class="confetti" style="left:680px;top:920px;" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#8FD6A8"/></svg>
+
+    <div class="party-wrap">
+      <div class="party-card">
+        <img class="party-sheep" src="assets/sheep-jump.png" alt="" />
+        <div class="party-big" id="party-points">+20 积分到账！</div>
+        <div class="party-sub" id="party-task">完成「背诵英语单词 20 个」</div>
+        <div class="balance">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" fill="#E8A317"/><circle cx="9" cy="9" r="4.8" stroke="#FFF3D2" stroke-width="1.6"/></svg>
+          <span id="party-balance">当前余额 1,300 积分</span>
+        </div>
+      </div>
+
+      <div class="streak-card">
+        <div class="flame-tile">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2.5c1.2 4.2-3.4 5.6-3.4 9.6a3.4 3.4 0 0 0 6.8 0c0-1.6-.8-2.9-1.6-4.1-.4 1.6-1.5 2.1-1.5 2.1s1.4-4.4-.3-7.6z" fill="#F08A24"/><path d="M12 21.5a6.8 6.8 0 0 1-6.8-6.8c0-1.5.5-2.8 1.2-4 .2 1.2 1 1.9 1 1.9s-.4-3.2 1.6-5.4C8.6 10.5 12 12 12 12s-1.6 1.4-1.6 3a1.9 1.9 0 0 0 3.3 1.3c.5 1 .9 1.7.9 2.6A6.8 6.8 0 0 1 12 21.5z" fill="#F5A623"/></svg>
+        </div>
+        <div class="col spacer">
+          <div class="streak-title">连续打卡 7 天</div>
+          <div class="streak-sub">再坚持 3 天，额外获得 50 积分鼓励金</div>
+        </div>
+        <div class="streak-badge">还差 3 天</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" id="go-shop">去兑换奖励</button>
+        <button class="btn-ghost" id="keep-going">继续加油</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+
+<script>
+(function(){
+  var device = document.getElementById('device');
+
+  /* ---- 运行平台判定：iOS / iPadOS 原生壳 ---- */
+  var isNative = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.native);
+  var isIOS = isNative || /iPad|iPhone|iPod/.test(navigator.userAgent)
+              || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS) document.body.classList.add('ios');
+
+  /* 原生壳内离线运行：移除远程字体请求，直接使用系统字族，避免首屏等待 */
+  if (isNative){
+    ['fonts.googleapis.com','fonts.gstatic.com'].forEach(function(host){
+      var link = document.querySelector('link[href*="' + host + '"]');
+      if (link && link.parentNode) link.parentNode.removeChild(link);
+    });
+  }
+
+  function fit(){
+    if (isIOS){ device.style.setProperty('--s', 1); return; }
+    var s = Math.min(1, (window.innerHeight - 48) / 1180, (window.innerWidth - 48) / 820);
+    device.style.setProperty('--s', s);
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', function(){ setTimeout(fit, 120); });
+  fit();
+
+  /* ---- 禁用双指缩放 / 双击缩放 / 长按菜单（还原原生 App 手感） ---- */
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+  document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  document.addEventListener('touchmove', function(e){ if (e.touches.length > 1) e.preventDefault(); }, {passive:false});
+
+  /* ---- 与原生壳通信：反馈按钮触感/状态 ---- */
+  function haptic(type){
+    if (isNative && window.webkit.messageHandlers.native){
+      try { window.webkit.messageHandlers.native.postMessage({action:'haptic', type:type||'light'}); } catch(e){}
+    }
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-haptic],button,.btn,.tap') : null;
+    if (t) haptic('light');
+  }, true);
+
+  var points = 1280, weekGot = 210, weekGoal = 280, doneCount = 1, totalCount = 4;
+  var fmt = function(n){ return n.toLocaleString('en-US'); };
+  function renderPoints(){
+    document.getElementById('pts-home').textContent = fmt(points) + ' 积分';
+    document.getElementById('pts-shop').textContent = fmt(points) + ' 积分';
+    document.getElementById('week-got').textContent = weekGot;
+    var pct = Math.min(100, Math.round(weekGot / weekGoal * 100));
+    document.getElementById('week-bar').style.width = pct + '%';
+    var left = Math.max(0, weekGoal - weekGot);
+    document.getElementById('week-cap').textContent = left > 0
+      ? '还差 ' + left + ' 分即可解锁「游乐园一日游」'
+      : '本周目标已完成，太棒了！';
+    document.getElementById('task-count').textContent = '共 ' + totalCount + ' 项 · 已完成 ' + doneCount + ' 项';
+  }
+
+  function show(name){
+    ['home','plan','shop','parent'].forEach(function(k){
+      document.getElementById('s-' + k).classList.toggle('active', k === name);
+    });
+  }
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      show(t.dataset.go);
+      document.querySelectorAll('.navpill').forEach(function(p){
+        p.querySelectorAll('.tab').forEach(function(x){
+          var on = x.dataset.go === t.dataset.go;
+          x.classList.toggle('active', on);
+          var svg = x.querySelector('svg');
+          if(svg){
+            svg.querySelectorAll('*').forEach(function(el){
+              if(el.tagName === 'path' || el.tagName === 'rect' || el.tagName === 'circle'){
+                if(on){ if(el.getAttribute('fill') && el.getAttribute('fill') !== 'none') el.setAttribute('fill','#FFFFFF'); if(el.getAttribute('stroke')) el.setAttribute('stroke','#FFFFFF'); }
+                else { var d = el.tagName === 'path'; if(el.getAttribute('fill') && el.getAttribute('fill') !== 'none') el.setAttribute('fill','#8296A9'); if(el.getAttribute('stroke')) el.setAttribute('stroke','#8296A9'); }
+              }
+            });
+          }
+        });
+      });
+    });
+  });
+
+  var toast = document.getElementById('toast'), tt;
+  function say(msg){ toast.textContent = msg; toast.classList.add('show'); clearTimeout(tt); tt = setTimeout(function(){ toast.classList.remove('show'); }, 1900); }
+
+  var pendingCard = null;
+  document.querySelectorAll('.btn-check').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var card = btn.closest('.task-card');
+      pendingCard = card;
+      var pts = parseInt(card.dataset.pts, 10);
+      document.getElementById('party-points').textContent = '+' + pts + ' 积分到账！';
+      document.getElementById('party-task').textContent = '完成「' + card.dataset.name + '」';
+      document.getElementById('party-balance').textContent = '当前余额 ' + fmt(points + pts) + ' 积分';
+      document.getElementById('s-party').classList.add('active');
+    });
+  });
+
+  function finishCheckin(){
+    if(pendingCard){
+      var pts = parseInt(pendingCard.dataset.pts, 10);
+      points += pts; weekGot += pts; doneCount++;
+      var btn = pendingCard.querySelector('.btn-check');
+      if(btn){
+        var d = document.createElement('div');
+        d.className = 'btn-done';
+        d.style.background = '#E2F4EA'; d.style.color = '#3E9A6C';
+        d.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 8.5l3.5 3.5 7.5-8" stroke="#3E9A6C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>已完成';
+        btn.replaceWith(d);
+      }
+      renderPoints();
+      pendingCard = null;
+    }
+    document.getElementById('s-party').classList.remove('active');
+  }
+
+  document.getElementById('keep-going').addEventListener('click', finishCheckin);
+  document.getElementById('go-shop').addEventListener('click', function(){
+    finishCheckin();
+    show('shop');
+    document.querySelectorAll('.navpill').forEach(function(p){
+      p.querySelectorAll('.tab').forEach(function(x){
+        x.classList.toggle('active', x.dataset.go === 'shop');
+        var svg = x.querySelector('svg');
+        if(svg) svg.querySelectorAll('*').forEach(function(el){
+          if(el.tagName === 'path' || el.tagName === 'rect' || el.tagName === 'circle'){
+            var on = x.dataset.go === 'shop';
+            if(el.getAttribute('fill') && el.getAttribute('fill') !== 'none') el.setAttribute('fill', on ? '#FFFFFF' : '#8296A9');
+            if(el.getAttribute('stroke')) el.setAttribute('stroke', on ? '#FFFFFF' : '#8296A9');
+          }
+        });
+      });
+    });
+  });
+
+  document.querySelectorAll('.btn-buy').forEach(function(b){
+    b.addEventListener('click', function(){
+      if(b.classList.contains('locked') || b.classList.contains('used')) return;
+      var price = parseInt(b.dataset.price, 10);
+      if(points < price){ say('积分还不够，再完成几个任务吧'); return; }
+      points -= price;
+      b.textContent = '已兑换'; b.classList.add('used');
+      renderPoints();
+      say('兑换成功：' + b.dataset.title + ' · 已通知爸爸妈妈');
+    });
+  });
+
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click', function(){
+      c.parentElement.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('on'); });
+      c.classList.add('on');
+    });
+  });
+  document.querySelectorAll('.diff').forEach(function(d){
+    d.addEventListener('click', function(){
+      document.querySelectorAll('.diff').forEach(function(x){
+        x.style.background = '#FFFFFF'; x.style.border = '1px solid #D8E6F2';
+      });
+      d.style.background = '#E1F0FC'; d.style.border = '2px solid #3F97E3';
+    });
+  });
+
+  function refreshPending(){
+    var rows = document.querySelectorAll('.cf-row[data-pending]');
+    var n = 0;
+    rows.forEach(function(r){ if(r.style.display !== 'none') n++; });
+    document.getElementById('pending-badge').textContent = n > 0 ? n + ' 项待审核' : '已全部审核';
+    document.getElementById('pending-empty').style.display = n > 0 ? 'none' : 'flex';
+  }
+  document.querySelectorAll('.cf-row[data-pending]').forEach(function(row){
+    row.querySelector('.btn-ok').addEventListener('click', function(){
+      row.style.opacity = '0'; setTimeout(function(){ row.style.display = 'none'; refreshPending(); }, 240);
+      say('已通过：' + row.querySelector('.cf-name').textContent + ' · 积分已发放');
+    });
+    row.querySelector('.btn-no').addEventListener('click', function(){
+      row.style.opacity = '0'; setTimeout(function(){ row.style.display = 'none'; refreshPending(); }, 240);
+      say('已退回，请孩子重新提交打卡');
+    });
+  });
+
+  document.querySelectorAll('.entry').forEach(function(e){
+    e.addEventListener('click', function(){ say('功能演示：' + e.querySelector('.entry-label').textContent); });
+  });
+  document.querySelector('.add-btn').addEventListener('click', function(){ say('已把任务加入本周计划'); });
+  document.querySelector('.cta').addEventListener('click', function(){ say('本周计划已保存 🎉'); });
+
+  renderPoints();
+
+  /* ---- PWA：Service Worker 离线缓存 ---- */
+  if ('serviceWorker' in navigator && location.protocol === 'https:'){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>

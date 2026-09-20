@@ -1,0 +1,28 @@
+# ---------- 构建产物 ----------
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.xcarchive
+
+# ---------- 签名证书 / 密钥：绝不入库 ----------
+ios/certs/
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key
+*.cer
+*.der
+
+# ---------- 依赖 ----------
+node_modules/
+
+# ---------- 系统与编辑器 ----------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---------- 本地临时文件 ----------
+*.log
