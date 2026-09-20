@@ -1,6 +1,25 @@
 # 咩咩学 · GitHub 部署步骤
 
-本地 git 仓库已初始化完毕，代码已提交。按下面的顺序做一次即可。
+## ✅ 当前部署状态（已完成）
+
+| 项目 | 值 |
+|---|---|
+| 仓库 | https://github.com/dlhou666/miemie-learn （Public） |
+| 分支 | `main`（默认分支） |
+| Pages 地址 | **https://dlhou666.github.io/miemie-learn/** |
+| Pages 模式 | Deploy from a branch（main / 根目录） |
+| 已提交 | 69 个文件 |
+
+首页、manifest、sw.js、CSS、JS、图标、插图均已验证可访问（HTTP 200）。
+
+> ⚠️ **换地址 = 换存储空间。** 旧地址（workbuddy 那个）的小红花数据不会自动跟过来。
+> 先在旧地址导出 JSON（我 → 小红花 → 备份我的数据），再在新地址导入一次。
+
+---
+
+以下为首次部署的操作记录，供迁移到其他仓库时参考。
+
+## 一、建仓库
 
 ## 一、建仓库
 
@@ -62,3 +81,36 @@ git push
 ```
 
 **如果改了页面的 css/js/图片，记得把 `sw.js` 里的 `CACHE` 版本号 +1**，否则 iPad 上已添加到主屏幕的 App 会一直读旧缓存，看不到新界面。
+
+---
+
+## 七、已知遗留问题与本机环境坑
+
+### 1. `.github/workflows/` 两个文件未提交
+
+`pages.yml` 和 `ios-build.yml` **不在仓库里**。原因是首次部署用的令牌只勾了 `repo`，没有 `workflow` 权限；GitHub 对无权限的 workflow 文件操作**返回 404 而非 403**（故意隐藏），所以被跳过。
+
+Pages 已改用「从分支部署」，不依赖 Actions，网页版不受影响。但 **iOS 云端编译暂时用不了**，需要补上 `ios-build.yml`。
+
+二选一：
+
+- **重新生成令牌**：https://github.com/settings/tokens/new → 勾选 **`repo` + `workflow`** → 交给助手补交（推荐）
+- **网页手动创建**：仓库 → Add file → Create new file → 路径填 `.github/workflows/ios-build.yml` → 粘贴本地同名文件内容 → Commit
+
+### 2. 本机 `git push` 走不通
+
+这台机器访问 `github.com` 会 `CONNECT tunnel failed, 502`（代理隧道问题），但 `api.github.com` 正常。所以代码是通过 **GitHub API（blobs → tree → commit → ref）** 提交的，不是 git push。
+
+后续在本机更新代码，若 `git push` 失败，沿用同样方式即可。
+
+### 3. 空仓库的 blobs API 限制
+
+完全空的仓库（无任何 commit）上调用创建 blob 会返回 `409 Git Repository is empty`。必须先通过 Contents API 播一个初始提交。
+
+### 4. 中文文件名
+
+`git ls-files` 默认会把非 ASCII 路径转义成八进制（如 `GITHUB\351\203\250...md`）。提交脚本必须加 `-c core.quotepath=false`，否则路径会错。
+
+### 5. 令牌已过期处理
+
+首次部署用的令牌有效期 7 天。到期后重新生成一个即可，**记得勾 `workflow`**。
