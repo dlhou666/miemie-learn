@@ -8,6 +8,8 @@
   var selectedDate = MM.todayKey();
   var calCursor = new Date();
   var ui = { parentUnlocked: false, honorFilter: 'all' };
+  /* 运行于 iOS 原生壳内（ViewController 注入）：隐藏 PWA 专属提示 */
+  var NATIVE = !!window.__NATIVE_SHELL__;
 
   /* ================= 基础工具 ================= */
   function esc(s) {
@@ -52,22 +54,63 @@
     return emoji || '⭐';
   }
 
-  /* ================= 弹层 ================= */
+  /* ================= 弹层（栈式） =================
+   * openSheet   打开新弹层；若当前已有弹层，先把旧 DOM 压栈，
+   *             关闭时回到上一层（表单内容不丢）。
+   * replaceSheet 在当前弹层内原地重绘（列表刷新等），不压栈。
+   * opts.render 返回本层时的刷新钩子（如刷新选项行 / 重绘列表）。 */
+  var sheetStack = [];
   var sheetRender = null;
-  function openSheet(title, html, after) {
-    var root = $('#modalRoot');
-    $('#sheetBody').innerHTML =
-      '<div class="close-row"><button class="icon-btn" data-act="close">✕</button></div>' +
+
+  function sheetHtml(title, html) {
+    return '<div class="close-row"><button class="icon-btn" data-act="close" aria-label="关闭">✕</button></div>' +
       (title ? '<h3>' + esc(title) + '</h3>' : '') + html;
+  }
+  function openSheet(title, html, after, opts) {
+    opts = opts || {};
+    var root = $('#modalRoot'), body = $('#sheetBody');
+    if (!root.hidden && body.firstChild) {
+      var frag = document.createDocumentFragment();
+      while (body.firstChild) frag.appendChild(body.firstChild);
+      sheetStack.push({ node: frag, scroll: body.scrollTop, render: sheetRender });
+    }
+    sheetRender = opts.render || null;
+    body.innerHTML = sheetHtml(title, html);
+    body.scrollTop = 0;
     root.hidden = false;
     if (after) after(root);
-    sheetRender = null;
+    body.setAttribute('tabindex', '-1');
+    body.focus({ preventScroll: true });
   }
-  function closeSheet() { $('#modalRoot').hidden = true; }
-
-  function reroote() {
-    // 弹层内容局部刷新：重新执行最近一次渲染函数
-    if (sheetRender) sheetRender();
+  function replaceSheet(title, html, after) {
+    var root = $('#modalRoot'), body = $('#sheetBody');
+    body.innerHTML = sheetHtml(title, html);
+    body.scrollTop = 0;
+    root.hidden = false;
+    if (after) after(root);
+    body.setAttribute('tabindex', '-1');
+    body.focus({ preventScroll: true });
+  }
+  function closeSheet() {
+    var root = $('#modalRoot'), body = $('#sheetBody');
+    if (sheetStack.length) {
+      var prev = sheetStack.pop();
+      sheetRender = prev.render;
+      body.innerHTML = '';
+      body.appendChild(prev.node);            // 恢复原 DOM：已填的表单值原样保留
+      body.scrollTop = prev.scroll || 0;
+      if (prev.render) prev.render();         // 可选：用最新数据刷新本层
+      return;
+    }
+    sheetRender = null;
+    root.hidden = true;
+    body.innerHTML = '';
+  }
+  function closeAllSheets() {
+    sheetStack.length = 0;
+    sheetRender = null;
+    $('#modalRoot').hidden = true;
+    $('#sheetBody').innerHTML = '';
   }
 
   /* ================= 主题与品牌 ================= */
@@ -94,6 +137,9 @@
   }
 
   /* ================= 视图切换 ================= */
+  var scrollPos = {};   // 各视图滚动位置：切 Tab 后回到原处
+  function viewEl(v) { return $('#v' + v.charAt(0).toUpperCase() + v.slice(1)); }
+
   function go(view) {
     if (view === 'parent' && !ui.parentUnlocked) {
       requireParent(function () {
@@ -102,10 +148,18 @@
       });
       return;
     }
+    /* 离开家长中心立即锁定：家长密码不能一次解锁、整场会话免检 */
+    if (current === 'parent' && view !== 'parent') ui.parentUnlocked = false;
+    if (current !== view) {
+      var prevEl = viewEl(current);
+      if (prevEl) scrollPos[current] = prevEl.scrollTop;
+    }
     current = view;
     $$('.view').forEach(function (v) { v.classList.toggle('is-active', v.dataset.view === view); });
     $$('.tab').forEach(function (t) { t.classList.toggle('is-active', t.dataset.go === view); });
     renderView(view);
+    var el = viewEl(view);
+    if (el) el.scrollTop = scrollPos[view] || 0;
   }
 
   function renderView(v) {
@@ -133,11 +187,13 @@
       '<div class="mascot"><img src="assets/sheep-wave.png" alt=""></div>' +
       '<div class="hero-body">' +
         '<div class="hero-label">本周目标 · 连续打卡 ' + streak + ' 天</div>' +
-        '<div class="hero-num"><b>' + ws.done + '</b><span>/ ' + ws.target + ' 朵</span></div>' +
+        '<div class="hero-num"><b>' + ws.done + '</b><span>/ ' + (ws.target || '—') + ' 朵</span></div>' +
         '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="hero-cap">' + (ws.target - ws.done > 0
-          ? '本周还差 ' + (ws.target - ws.done) + ' 朵达成目标'
-          : '本周目标已达成，太棒啦！') + '</div>' +
+        '<div class="hero-cap">' + (!ws.target
+          ? '本周还没排计划，去「计划」页安排吧'
+          : (ws.target - ws.done > 0
+            ? '本周还差 ' + (ws.target - ws.done) + ' 朵达成目标'
+            : '本周目标已达成，太棒啦！')) + '</div>' +
       '</div></div>';
 
     // 心愿目标
@@ -278,6 +334,19 @@
     html += '</div></div>';
 
     $('#vPlan').innerHTML = html;
+  }
+
+  /* 翻月：保持选中日期始终落在日历可见月份内 */
+  function shiftMonth(delta) {
+    calCursor.setMonth(calCursor.getMonth() + delta);
+    var y = calCursor.getFullYear(), m = calCursor.getMonth();
+    var d = MM.parseKey(selectedDate);
+    if (d.getFullYear() !== y || d.getMonth() !== m) {
+      var maxDay = new Date(y, m + 1, 0).getDate();
+      var day = Math.min(d.getDate(), maxDay);
+      selectedDate = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    }
+    renderView('plan');
   }
 
   function calendarHtml() {
@@ -443,10 +512,10 @@
       '<div class="mascot" style="width:64px;height:64px"><img src="assets/sheep-parent.png" alt=""></div>' +
       '<div class="hero-body"><div class="hero-label">家长中心 · ' + esc(p.name) + '</div>' +
       '<div class="hero-num" style="margin:2px 0 0"><b style="font-size:20px">' + (S.state.settings.pin ? '🔒 密码已启用' : '⚠️ 尚未设置密码') + '</b></div>' +
-      '<div class="hero-cap">管理 »+» 计划、分类、难度、奖励与数据同步</div></div></div>';
+      '<div class="hero-cap">管理计划、分类、难度、奖励与数据同步</div></div></div>';
 
     html += '<div class="stat-grid">' +
-      '<div class="stat"><b style="color:var(--accent-deep)">' + pct + '%</b><span>本周完成率</span></div>' +
+      '<div class="stat"><b style="color:var(--accent-deep)">' + (ws.target ? pct + '%' : '—') + '</b><span>本周完成率</span></div>' +
       '<div class="stat"><b style="color:var(--gold)">' + ws.done + '</b><span>本周获得(朵)</span></div>' +
       '<div class="stat"><b style="color:var(--green)">' + S.streak() + '</b><span>连续打卡(天)</span></div>' +
       '</div>';
@@ -495,7 +564,6 @@
   /* ================= PIN ================= */
   function openPin(title, onOk, isSet) {
     var buf = '';
-    sheetRender = null;
 
     function dotsHtml() {
       var filled = buf.length;
@@ -505,19 +573,21 @@
       return html;
     }
 
-    function draw() {
-      openSheet(title,
-        '<div class="pin-wrap"><div class="pin-dots">' + dotsHtml() + '</div>' +
+    function draw(redraw) {
+      (redraw ? replaceSheet : openSheet)(title, pinHtml(), bind);
+    }
+
+    function pinHtml() {
+      return '<div class="pin-wrap"><div class="pin-dots">' + dotsHtml() + '</div>' +
         '<div class="keypad">' +
           [1,2,3,4,5,6,7,8,9].map(function (n) { return '<button data-pin="' + n + '">' + n + '</button>'; }).join('') +
           '<button class="fn" data-pin="clear">清空</button>' +
-          '<button data-pin="0">0</button>' +
+          '<button data-pin="0" aria-label="数字 0">0</button>' +
           '<button class="fn" data-pin="del">删除</button>' +
         '</div>' +
         '<button class="btn block lg" data-act="pin-done" style="margin-top:16px">' +
           (isSet ? '确认使用' : '确定') + '</button>' +
-        '<button class="btn block lg ghost" data-act="close" style="margin-top:10px">取消</button></div>',
-        bind);
+        '<button class="btn block lg ghost" data-act="close" style="margin-top:10px">取消</button></div>';
     }
 
     function bind(root) {
@@ -528,7 +598,7 @@
           if (v === 'del') buf = buf.slice(0, -1);
           else if (v === 'clear') buf = '';
           else if (buf.length < 6) buf += v;
-          draw();
+          draw(true);
         });
       });
       $('[data-act="pin-done"]', root).addEventListener('click', function () {
@@ -536,8 +606,8 @@
           if (buf.length < 4) { toast('至少 4 位'); return; }
           closeSheet(); onOk(buf);
         } else {
-          if (buf === S.state.settings.pin) { closeSheet(); onOk(); }
-          else { toast('密码不正确'); buf = ''; draw(); }
+          if (buf === S.state.settings.pin) { closeAllSheets(); onOk(); }
+          else { toast('密码不正确'); buf = ''; draw(true); }
         }
       });
     }
@@ -568,7 +638,7 @@
             cb();
           }, true);
         });
-        $('[data-act="pin-skip"]', root).addEventListener('click', function () { closeSheet(); cb(); });
+        $('[data-act="pin-skip"]', root).addEventListener('click', function () { closeAllSheets(); cb(); });
       });
   }
 
@@ -596,42 +666,25 @@
       name: t.name, cat: t.cat, diffId: t.diffId, count: t.count, unit: t.unit, flowers: t.flowers
     } : { name: '', cat: p.categories[0].id, diffId: p.diffs[0].id, count: 1, unit: '', flowers: p.diffs[0].flowers };
 
-    sheetRender = function () { sheetTaskEditor(key, taskId); };
-    var html =
-      '<div class="field"><label>名称</label><input id="fName" placeholder="例如：口算练习" value="' + esc(form.name) + '"></div>' +
-      '<div class="field"><label>数量</label>' +
-        '<div class="stepper"><button type="button" id="cntDown">−</button><span class="val" id="cntVal">' + form.count + '</span><button type="button" id="cntUp">＋</button></div>' +
-      '</div>' +
-      '<div class="field"><label>单位</label><input id="fUnit" placeholder="题 / 页 / 分钟" value="' + esc(form.unit) + '"></div>' +
-      '<div class="sec-title" style="margin:14px 0 8px">分类</div><div class="chips-row" id="catRow">' +
-        p.categories.map(function (c) {
-          return '<button class="chip-sel' + (c.id === form.cat ? ' on' : '') + '" data-cat="' + c.id + '">' + c.emoji + ' ' + esc(c.name) + '</button>';
-        }).join('') +
-        '<button class="chip-sel" data-act="open" data-sheet="categories">＋ 管理</button></div>' +
-      '<div class="sec-title" style="margin:14px 0 8px">难度（对应小红花）</div><div class="chips-row" id="diffRow">' +
-        p.diffs.map(function (d) {
-          return '<button class="chip-sel' + (d.id === form.diffId ? ' on' : '') + '" data-diff="' + d.id + '">' +
-            d.emoji + ' ' + esc(d.name) + ' · ' + d.flowers + ' 朵</button>';
-        }).join('') +
-        '<button class="chip-sel" data-act="open" data-sheet="diffs">＋ 管理</button></div>' +
-      '<div class="hint">花朵数也可单独调整：</div>' +
-      '<div class="field"><label>花数</label>' +
-        '<div class="stepper"><button type="button" id="flDown">−</button><span class="val" id="flVal">' + form.flowers + '</span><button type="button" id="flUp">＋</button></div>' +
-        '<span class="muted" style="flex:none">朵</span></div>' +
-      '<button class="btn block lg" data-act="task-save" style="margin-top:14px">' + (t ? '保存修改' : '添加到这一天') + '</button>' +
-      (t ? '<button class="btn block lg ghost" data-act="task-del" data-key="' + key + '" data-id="' + t.id + '" style="margin-top:10px">删除任务</button>' : '');
+    /* 表单状态提升到本层作用域：从子弹层返回后仍可读取/刷新 */
+    var cnt = form.count, fl = form.flowers;
+    var pickCat = form.cat, pickDiff = form.diffId;
+    var flDirty = false;   // 用户手动调过花数后，选难度不再覆盖花数
 
-    openSheet(t ? '编辑任务' : '添加任务', html, function (root) {
-      var cnt = form.count, fl = form.flowers;
-      var pickCat = form.cat, pickDiff = form.diffId;
-      $('#cntVal', root).textContent = cnt;
-      $('#flVal', root).textContent = fl;
-
-      $('#cntDown', root).addEventListener('click', function () { cnt = Math.max(0, cnt - 1); $('#cntVal', root).textContent = cnt; });
-      $('#cntUp', root).addEventListener('click', function () { cnt += 1; $('#cntVal', root).textContent = cnt; });
-      $('#flDown', root).addEventListener('click', function () { fl = Math.max(0, fl - 1); $('#flVal', root).textContent = fl; });
-      $('#flUp', root).addEventListener('click', function () { fl += 1; $('#flVal', root).textContent = fl; });
-
+    function catChipsHtml() {
+      return p.categories.map(function (c) {
+        return '<button class="chip-sel' + (c.id === pickCat ? ' on' : '') + '" data-cat="' + c.id + '">' + c.emoji + ' ' + esc(c.name) + '</button>';
+      }).join('') +
+        '<button class="chip-sel" data-act="open" data-sheet="categories">＋ 管理</button>';
+    }
+    function diffChipsHtml() {
+      return p.diffs.map(function (d) {
+        return '<button class="chip-sel' + (d.id === pickDiff ? ' on' : '') + '" data-diff="' + d.id + '">' +
+          d.emoji + ' ' + esc(d.name) + ' · ' + d.flowers + ' 朵</button>';
+      }).join('') +
+        '<button class="chip-sel" data-act="open" data-sheet="diffs">＋ 管理</button>';
+    }
+    function bindChips(root) {
       $$('#catRow [data-cat]', root).forEach(function (b) {
         b.addEventListener('click', function () {
           pickCat = b.dataset.cat;
@@ -641,9 +694,41 @@
       $$('#diffRow [data-diff]', root).forEach(function (b) {
         b.addEventListener('click', function () {
           pickDiff = b.dataset.diff;
+          /* 难度 ↔ 花数联动：没手动改过花数时，跟随所选难度的默认花数 */
+          if (!flDirty) {
+            var d = p.diffs.filter(function (x) { return x.id === pickDiff; })[0];
+            if (d) { fl = d.flowers; $('#flVal', root).textContent = fl; }
+          }
           $$('#diffRow .chip-sel', root).forEach(function (x) { x.classList.toggle('on', x.dataset.diff === pickDiff); });
         });
       });
+    }
+
+    var html =
+      '<div class="field"><label>名称</label><input id="fName" placeholder="例如：口算练习" value="' + esc(form.name) + '"></div>' +
+      '<div class="field"><label>数量</label>' +
+        '<div class="stepper"><button type="button" id="cntDown">−</button><span class="val" id="cntVal">' + form.count + '</span><button type="button" id="cntUp">＋</button></div>' +
+      '</div>' +
+      '<div class="field"><label>单位</label><input id="fUnit" placeholder="题 / 页 / 分钟" value="' + esc(form.unit) + '"></div>' +
+      '<div class="sec-title" style="margin:14px 0 8px">分类</div><div class="chips-row" id="catRow">' + catChipsHtml() + '</div>' +
+      '<div class="sec-title" style="margin:14px 0 8px">难度（对应小红花）</div><div class="chips-row" id="diffRow">' + diffChipsHtml() + '</div>' +
+      '<div class="hint">花朵数也可单独调整：</div>' +
+      '<div class="field"><label>花数</label>' +
+        '<div class="stepper"><button type="button" id="flDown">−</button><span class="val" id="flVal">' + form.flowers + '</span><button type="button" id="flUp">＋</button></div>' +
+        '<span class="muted" style="flex:none">朵</span></div>' +
+      '<button class="btn block lg" data-act="task-save" style="margin-top:14px">' + (t ? '保存修改' : '添加到这一天') + '</button>' +
+      (t ? '<button class="btn block lg ghost" data-act="task-del" data-key="' + key + '" data-id="' + t.id + '" style="margin-top:10px">删除任务</button>' : '');
+
+    openSheet(t ? '编辑任务' : '添加任务', html, function (root) {
+      $('#cntVal', root).textContent = cnt;
+      $('#flVal', root).textContent = fl;
+
+      $('#cntDown', root).addEventListener('click', function () { cnt = Math.max(0, cnt - 1); $('#cntVal', root).textContent = cnt; });
+      $('#cntUp', root).addEventListener('click', function () { cnt += 1; $('#cntVal', root).textContent = cnt; });
+      $('#flDown', root).addEventListener('click', function () { fl = Math.max(0, fl - 1); flDirty = true; $('#flVal', root).textContent = fl; });
+      $('#flUp', root).addEventListener('click', function () { fl += 1; flDirty = true; $('#flVal', root).textContent = fl; });
+
+      bindChips(root);
 
       $('[data-act="task-save"]', root).addEventListener('click', function () {
         var name = $('#fName', root).value.trim();
@@ -651,18 +736,25 @@
         var data = { name: name, cat: pickCat, diffId: pickDiff, flowers: fl, count: cnt, unit: $('#fUnit', root).value.trim() };
         if (t) S.updateTask(key, t.id, data);
         else S.addTask(key, data);
-        closeSheet();
+        closeAllSheets();
         toast(t ? '已保存' : '已添加');
-        renderView(planish(current));
+        renderView(current);
       });
+    }, {
+      /* 从「＋管理」返回本层：只刷新分类/难度选项行，已填内容原样保留 */
+      render: function () {
+        var root = $('#sheetBody');
+        var catRow = $('#catRow', root), diffRow = $('#diffRow', root);
+        if (catRow) catRow.innerHTML = catChipsHtml();
+        if (diffRow) diffRow.innerHTML = diffChipsHtml();
+        bindChips(root);
+      }
     });
   }
-  function planish(v) { return v === 'plan' ? 'plan' : v; }
 
-  function sheetCategories() {
+  function sheetCategories(redraw) {
     var p = S.p();
-    sheetRender = sheetCategories;
-    openSheet('任务分类',
+    (redraw ? replaceSheet : openSheet)('任务分类',
       '<div class="hint">孩子常用的科目或活动分类，可自由增加与删除。</div>' +
       '<div class="preset-grid">' + p.categories.map(function (c) {
         return '<div class="preset"><div class="p-title">' + c.emoji + ' ' + esc(c.name) +
@@ -677,7 +769,7 @@
       function (root) {
         $$('[data-del-cat]', root).forEach(function (b) {
           b.addEventListener('click', function () {
-            if (S.removeCategory(b.dataset.delCat)) { sheetCategories(); }
+            if (S.removeCategory(b.dataset.delCat)) { sheetCategories(true); }
             else toast('至少保留一个分类');
           });
         });
@@ -686,15 +778,14 @@
           if (!n) { toast('请填写名称'); return; }
           var e = $('#catEmoji', root).value.trim() || '⭐';
           S.addCategory(n, e);
-          sheetCategories();
+          sheetCategories(true);
         });
       });
   }
 
-  function sheetDiffs() {
+  function sheetDiffs(redraw) {
     var p = S.p();
-    sheetRender = sheetDiffs;
-    openSheet('难度与小红花',
+    (redraw ? replaceSheet : openSheet)('难度与小红花',
       '<div class="hint">难度对应每完成一项任务可得的小红花数量，可自由增加、修改与删除。</div>' +
       '<div class="preset-grid">' + p.diffs.map(function (d) {
         return '<div class="preset"><div class="p-title">' + (d.emoji || '🌱') + ' ' + esc(d.name) + '</div>' +
@@ -711,13 +802,13 @@
         function bump(id, delta) {
           var d = p.diffs.filter(function (x) { return x.id === id; })[0];
           S.updateDiff(id, { flowers: Math.max(1, (d.flowers || 0) + delta) });
-          sheetDiffs();
+          sheetDiffs(true);
         }
         $$('[data-df-up]', root).forEach(function (b) { b.addEventListener('click', function () { bump(b.dataset.dfUp, 1); }); });
         $$('[data-df-down]', root).forEach(function (b) { b.addEventListener('click', function () { bump(b.dataset.dfDown, -1); }); });
         $$('[data-del-diff]', root).forEach(function (b) {
           b.addEventListener('click', function () {
-            if (S.removeDiff(b.dataset.delDiff)) sheetDiffs();
+            if (S.removeDiff(b.dataset.delDiff)) sheetDiffs(true);
             else toast('至少保留一个难度');
           });
         });
@@ -725,7 +816,7 @@
           var n = $('#dfName', root).value.trim();
           if (!n) { toast('请填写名称'); return; }
           S.addDiff(n, +$('#dfFlowers', root).value || 10, '🌱');
-          sheetDiffs();
+          sheetDiffs(true);
         });
       });
   }
@@ -733,7 +824,6 @@
   function sheetRewardEditor(rid) {
     var p = S.p();
     var r = rid ? p.rewards.filter(function (x) { return x.id === rid; })[0] : null;
-    sheetRender = function () { sheetRewardEditor(rid); };
     openSheet(r ? '编辑奖励' : '新增奖励',
       '<div class="field"><label>名称</label><input id="rName" value="' + esc(r ? r.name : '') + '" placeholder="例如：周末看电影"></div>' +
       '<div class="field"><label>图标</label><input id="rEmoji" value="' + esc(r ? r.emoji : '🎁') + '" maxlength="4" style="max-width:90px">' +
@@ -771,8 +861,10 @@
   function sheetParentAdjust() {
     var p = S.p();
     var mode = 'plus';
-    sheetRender = sheetParentAdjust;
+    var opened = false;   // 模式切换时原地重绘，不往弹层栈里压新层
+    sheetRender = null;
     function draw() {
+      var emit = opened ? replaceSheet : openSheet; opened = true;
       var reasons = MM.REASONS[mode];
       var html =
         '<div class="chips-row" style="justify-content:center">' +
@@ -789,7 +881,7 @@
         }).join('') + '</div>' +
         '<div class="field"><label>备注</label><input id="ajNote" placeholder="可选，写点鼓励的话"></div>' +
         '<button class="btn block lg" data-act="aj-apply" style="margin-top:12px">确认' + (mode === 'plus' ? '奖励' : '扣除') + '</button>';
-      openSheet('手动调整小红花', html, bind);
+      emit('手动调整小红花', html, bind);
     }
     var amount = 5, note = '', reasonText = '';
     function bind(root) {
@@ -820,8 +912,7 @@
     draw();
   }
 
-  function sheetProfiles() {
-    sheetRender = sheetProfiles;
+  function sheetProfiles(redraw) {
     var html = '<div class="hint">家里有多个孩子？为每个孩子建立独立档案，小红花、计划与荣誉互不干扰。</div>';
     S.state.profiles.forEach(function (p) {
       var active = p.id === S.state.activeId;
@@ -835,7 +926,7 @@
     });
     html += '<button class="btn block lg" data-act="profile-add" style="margin-top:12px">＋ 添加孩子档案</button>';
 
-    openSheet('账户管理', html, function (root) {
+    (redraw ? replaceSheet : openSheet)('账户管理', html, function (root) {
       $$('[data-switch]', root).forEach(function (b) {
         b.addEventListener('click', function () {
           S.switchProfile(b.dataset.switch);
@@ -848,14 +939,13 @@
         b.addEventListener('click', function () { sheetProfileEditor(b.dataset.editProfile); });
       });
       $('[data-act="profile-add"]', root).addEventListener('click', sheetProfileAdd);
-    });
+    }, { render: function () { sheetProfiles(true); } });   // 编辑/新增档案返回后刷新列表
   }
 
   function sheetProfileAdd() { sheetProfileEditor(null); }
 
   function sheetProfileEditor(pid) {
     var p = pid ? S.byId(pid) : null;
-    sheetRender = function () { sheetProfileEditor(pid); };
     var av = p ? p.avatar : '🐑';
     var img = p ? p.avatarImg : null;
     openSheet(p ? '编辑档案' : '新增孩子档案',
@@ -886,9 +976,10 @@
             $('#avPrev', root).innerHTML = '<img src="' + d + '" style="width:72px;height:72px;border-radius:36px;object-fit:cover">';
           });
         });
-        $('[data-act="clear-avatar-img"]', root).addEventListener('click', function () {
+        var clearAv = $('[data-act="clear-avatar-img"]', root);
+        if (clearAv) clearAv.addEventListener('click', function () {
           pickImg = null; $('#avPrev', root).innerHTML = '';
-          sheetProfileEditor(pid);
+          clearAv.hidden = true;   // 就地隐藏，避免重绘丢掉已填的名字
         });
         $('[data-act="pf-save"]', root).addEventListener('click', function () {
           var n = $('#pfName', root).value.trim();
@@ -898,9 +989,8 @@
             var np = S.addProfile(n, pickAv);
             np.avatarImg = pickImg;
           }
-          S.save(); closeSheet();
+          S.save(); closeSheet();      // closeSheet 会回到「账户管理」并触发其刷新钩子
           applyHeader(); renderView(current);
-          sheetProfiles();
         });
         var del = $('[data-act="pf-del"]', root);
         if (del) del.addEventListener('click', function () {
@@ -912,10 +1002,9 @@
       });
   }
 
-  function sheetSettings() {
+  function sheetSettings(redraw) {
     var s = S.state.settings;
-    sheetRender = sheetSettings;
-    openSheet('外观与名称',
+    (redraw ? replaceSheet : openSheet)('外观与名称',
       '<div class="sec-title" style="margin:6px 0 8px">App 主题</div>' +
       '<div class="preset-grid">' + MM.THEMES.map(function (t) {
         return '<button class="preset" data-theme-pick="' + t.id + '" style="text-align:center;border:2px solid ' +
@@ -934,16 +1023,18 @@
         (s.logoImg ? '<button class="btn sm ghost" data-act="clear-logo">恢复默认</button>' : '') +
       '</div>' +
       '<div id="logoPrev" style="margin-bottom:10px">' + (s.logoImg ? '<img src="' + s.logoImg + '" style="width:64px;height:64px;border-radius:16px;object-fit:cover">' : '') + '</div>' +
-      '<div class="hint">提示：名称与 Logo 会立即在应用内生效；主屏幕图标需要在 iPad 上删除后重新「添加到主屏幕」才会更新。</div>',
+      '<div class="hint">' + (NATIVE
+        ? '提示：名称与 Logo 会立即在应用内生效。'
+        : '提示：名称与 Logo 会立即在应用内生效；主屏幕图标需要在 iPad 上删除后重新「添加到主屏幕」才会更新。') + '</div>',
       function (root) {
         $$('[data-theme-pick]', root).forEach(function (b) {
           b.addEventListener('click', function () {
-            s.theme = b.dataset.themePick; S.save(); applyTheme(); sheetSettings(); renderAll();
+            s.theme = b.dataset.themePick; S.save(); applyTheme(); sheetSettings(true); renderAll();
           });
         });
         $$('[data-logo]', root).forEach(function (b) {
           b.addEventListener('click', function () {
-            s.logo = b.dataset.logo; s.logoImg = null; S.save(); applyBrand(); sheetSettings();
+            s.logo = b.dataset.logo; s.logoImg = null; S.save(); applyBrand(); sheetSettings(true);
           });
         });
         $('#stName', root).addEventListener('change', function () {
@@ -951,15 +1042,14 @@
           S.save(); applyBrand();
         });
         $('[data-act="pick-logo-img"]', root).addEventListener('click', function () {
-          pickImage(function (d) { s.logoImg = d; S.save(); applyBrand(); sheetSettings(); });
+          pickImage(function (d) { s.logoImg = d; S.save(); applyBrand(); sheetSettings(true); });
         });
         var clear = $('[data-act="clear-logo"]', root);
-        if (clear) clear.addEventListener('click', function () { s.logoImg = null; S.save(); applyBrand(); sheetSettings(); });
+        if (clear) clear.addEventListener('click', function () { s.logoImg = null; S.save(); applyBrand(); sheetSettings(true); });
       });
   }
 
   function sheetBackup() {
-    sheetRender = sheetBackup;
     openSheet('备份与同步',
       '<div class="hint">因为没有登录账号，换设备靠「导出备份文件」迁移：<br>' +
       '1. 点导出，把文件存到 <b>iCloud 云盘 / 隔空投送 / 微信</b>；<br>' +
@@ -1022,9 +1112,14 @@
           var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           var cv = document.createElement('canvas');
           cv.width = w; cv.height = h;
-          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          var ctx = cv.getContext('2d');
+          /* 先铺白底：PNG 透明区转 JPEG 会变黑 */
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
           cb(cv.toDataURL('image/jpeg', 0.82));
         };
+        img.onerror = function () { toast('图片读取失败，换一张试试'); };
         img.src = reader.result;
       };
       reader.readAsDataURL(f);
@@ -1107,11 +1202,11 @@
             S.clearDay(selectedDate); renderView('plan');
           }
           return;
-        case 'cal-prev': calCursor.setMonth(calCursor.getMonth() - 1); renderView('plan'); return;
-        case 'cal-next': calCursor.setMonth(calCursor.getMonth() + 1); renderView('plan'); return;
+        /* 翻月后把选中日期钳到本月：否则日历高亮消失、下方列表显示的还是别的月份 */
+        case 'cal-prev': shiftMonth(-1); return;
+        case 'cal-next': shiftMonth(1); return;
         case 'cal-today':
-          var now = new Date();
-          calCursor = now; selectedDate = MM.todayKey(); renderView('plan');
+          calCursor = new Date(); selectedDate = MM.todayKey(); renderView('plan');
           return;
         case 'cal-day':
           selectedDate = el.dataset.key; renderView('plan');
@@ -1194,6 +1289,26 @@
     } catch (e) { console.warn('云端数据合并失败', e); }
   };
 
+  /* 存储写满：不再静默失败——弹横幅 + 引导导出备份 */
+  var quotaWarned = false;
+  MM.onStorageError = function () {
+    if (quotaWarned) return;
+    quotaWarned = true;
+    toast('存储空间已满，改动无法保存');
+    var el = document.createElement('div');
+    el.id = 'quotaBanner';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:120;background:#FFE9E9;color:#B3261E;' +
+      'padding:10px 14px;font-size:13px;text-align:center;border-top:1px solid #F3C6C2';
+    el.textContent = '⚠️ 存储空间已满，新的打卡/兑换不会被保存。请先导出备份，再删除一些奖励照片。';
+    document.body.appendChild(el);
+  };
+  MM.onStorageRecovered = function () {
+    quotaWarned = false;
+    var el = document.getElementById('quotaBanner');
+    if (el) el.remove();
+    toast('存储已恢复正常');
+  };
+
   applyTheme();
   applyBrand();
   applyHeader();
@@ -1203,7 +1318,32 @@
   document.addEventListener('dblclick', function (e) { e.preventDefault(); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
+  /* ESC / iPad 键盘退出：关闭当前弹层 */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('#modalRoot').hidden) { closeSheet(); e.preventDefault(); }
+  });
+
+  /* 切后台 / 上滑关闭前，把防抖队列里的改动立刻落盘 */
+  function flushNow() { if (S.flush) S.flush(); }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushNow();
+  });
+  window.addEventListener('pagehide', flushNow);
+  window.addEventListener('beforeunload', flushNow);
+
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      if (!reg) return;
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          // 已有旧 SW 时才提示，避免首次安装误报
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            toast('已装好新版本，重新打开后生效');
+          }
+        });
+      });
+    }).catch(function () {});
   }
 })();

@@ -24,21 +24,49 @@
   };
 
   var saveTimer = null;
+  S.quotaBlocked = false;   // localStorage 配额已满，写入失败
   S.save = function () {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () {
-      try { localStorage.setItem(KEY, JSON.stringify(S.state)); }
-      catch (e) { console.warn('保存失败', e); }
-      S.pushNative();
-    }, 120);
+    saveTimer = setTimeout(S.flush, 120);
+  };
+  /* 立即落盘：切后台 / 关闭页面前必须调用，
+   * 否则防抖窗口（120ms）内的最后一次操作会随进程一起丢失。 */
+  S.flush = function () {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(S.state));
+      if (S.quotaBlocked) {
+        S.quotaBlocked = false;
+        if (MM.onStorageRecovered) MM.onStorageRecovered();
+      }
+    } catch (e) {
+      /* 配额满 / 隐私模式：绝不能静默吞掉，必须让用户知道 */
+      S.quotaBlocked = true;
+      console.warn('保存失败', e);
+      if (MM.onStorageError) MM.onStorageError(e);
+    }
+    S.pushNative();
   };
 
-  /* 原生壳同步桥（ViewController 可接收并存入 iCloud KV） */
+  /* 原生壳同步桥（ViewController 接收后写入 iCloud KV）。
+   * ⚠️ NSUbiquitousKeyValueStore 单键硬上限 1MB：
+   *    快照先剥离所有图片 dataURL，仍超 900KB 则放弃上传，
+   *    避免超限写入静默失败造成「以为已同步」的假象。 */
   S.pushNative = function () {
     try {
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.icloud) {
-        window.webkit.messageHandlers.icloud.postMessage({ op: 'save', payload: JSON.stringify(S.state) });
+      if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.icloud)) return;
+      var lite = JSON.parse(JSON.stringify(S.state));
+      if (lite.settings) lite.settings.logoImg = null;
+      (lite.profiles || []).forEach(function (p) {
+        p.avatarImg = null;
+        (p.rewards || []).forEach(function (r) { r.img = null; });
+      });
+      var payload = JSON.stringify(lite);
+      if (payload.length > 900 * 1024) {
+        console.warn('iCloud 快照超过 900KB，已跳过本次上传');
+        return;
       }
+      window.webkit.messageHandlers.icloud.postMessage({ op: 'save', payload: payload });
     } catch (e) {}
   };
 
@@ -97,9 +125,10 @@
     if (!p.honors) p.honors = [];
     if (!p.log) p.log = [];
     if (!p.metrics) p.metrics = { challengeDone: 0, redeemCount: 0, goalDone: 0, bestStreak: 0 };
-    if (!p.categories.length) p.categories = MM.DEFAULT_CATEGORIES.slice();
-    if (!p.diffs.length) p.diffs = MM.DEFAULT_DIFFS.slice();
-    if (!p.rewards.length) p.rewards = MM.DEFAULT_REWARDS.slice();
+    /* 兜底预设与 newProfile 保持同构：带 preset 标记，避免「预设」角标显示不一致 */
+    if (!p.categories.length) p.categories = MM.DEFAULT_CATEGORIES.map(function (c) { return { id: c.id, name: c.name, emoji: c.emoji, preset: true }; });
+    if (!p.diffs.length) p.diffs = MM.DEFAULT_DIFFS.map(function (d) { return { id: d.id, name: d.name, flowers: d.flowers, emoji: d.emoji, preset: true }; });
+    if (!p.rewards.length) p.rewards = MM.DEFAULT_REWARDS.map(function (r) { return { id: r.id, name: r.name, emoji: r.emoji, price: r.price, stock: r.stock, preset: true }; });
   };
 
   S.p = function () {
@@ -226,7 +255,11 @@
     if (!t || t.done) return false;
     t.done = true; t.pending = false; t.ts = Date.now();
     S.grant(t.flowers, t.name, 'checkin', key);
-    if (t.flowers >= S.maxDiffFlowers()) p.metrics.challengeDone++;
+    // 标记本次计入过「挑战数」，撤销时对称回退，堵住反复打卡/撤销刷勋章的口子
+    if (t.flowers >= S.maxDiffFlowers()) {
+      p.metrics.challengeDone++;
+      t.countedChallenge = true;
+    }
     S.afterChange(key);
     S.save();
     return true;
@@ -240,6 +273,10 @@
     t.done = false; t.pending = false;
     p.flowers -= t.flowers;
     p.earned -= t.flowers;
+    if (t.countedChallenge) {
+      p.metrics.challengeDone = Math.max(0, p.metrics.challengeDone - 1);
+      t.countedChallenge = false;
+    }
     p.log.push({ id: MM.uid('l'), date: key, amount: -t.flowers, reason: '撤销打卡：' + t.name, kind: 'undo' });
     S.save();
     return true;
@@ -457,36 +494,69 @@
       });
       monday.setDate(monday.getDate() + 1);
     }
-    return { target: target || 280, done: done, flowers: done };
+    /* target 为 0 表示本周没排计划——如实返回 0，由界面走空态文案，
+     * 不再伪造 280 朵的默认目标误导新用户。 */
+    return { target: target, done: done, flowers: done };
   };
 
   /* ---------- 备份与恢复 ---------- */
-  S.serialize = function () { return JSON.stringify(S.state, null, 2); };
+  /* 导出的备份不含家长密码（明文外泄风险）；
+   * 导入时若备份里没有密码，保留本机已设置的密码。 */
+  S.serialize = function () {
+    var clone = JSON.parse(JSON.stringify(S.state));
+    if (clone.settings) clone.settings.pin = '';
+    return JSON.stringify(clone, null, 2);
+  };
+
+  /* 同名档案合并：days 按任务 id 求并集（不再按日期整段覆盖，避免丢任务），
+   * 荣誉/勋章/常用任务取并集，累计类计数取较大值。 */
+  S.mergeProfile = function (old, p) {
+    old.flowers = Math.max(old.flowers, p.flowers);
+    old.earned = Math.max(old.earned, p.earned);
+    Object.keys(p.days || {}).forEach(function (k) {
+      var remote = p.days[k] || [];
+      var local = old.days[k] = old.days[k] || [];
+      var byId = {};
+      local.forEach(function (t) { byId[t.id] = true; });
+      remote.forEach(function (t) { if (!byId[t.id]) local.push(t); });
+    });
+    var hIds = {};
+    old.honors.forEach(function (h) { hIds[h.id] = true; });
+    (p.honors || []).forEach(function (h) { if (!hIds[h.id]) { old.honors.push(h); hIds[h.id] = true; } });
+    Object.keys(p.badges || {}).forEach(function (b) { old.badges[b] = old.badges[b] || p.badges[b]; });
+    old.metrics = old.metrics || { challengeDone: 0, redeemCount: 0, goalDone: 0, bestStreak: 0 };
+    ['challengeDone', 'redeemCount', 'goalDone', 'bestStreak'].forEach(function (k) {
+      old.metrics[k] = Math.max(old.metrics[k] || 0, (p.metrics || {})[k] || 0);
+    });
+    var wIds = {};
+    old.honoredWeeks.forEach(function (w) { wIds[w] = true; });
+    (p.honoredWeeks || []).forEach(function (w) { if (!wIds[w]) { old.honoredWeeks.push(w); wIds[w] = true; } });
+    var tIds = {};
+    old.templates.forEach(function (t) { tIds[t.id] = true; });
+    (p.templates || []).forEach(function (t) { if (!tIds[t.id]) { old.templates.push(t); tIds[t.id] = true; } });
+  };
 
   S.restore = function (text, mode) {
     var obj = JSON.parse(text);
     if (!obj || !obj.profiles) throw new Error('文件格式不正确');
+    var prevPin = S.state && S.state.settings ? (S.state.settings.pin || '') : '';
     if (mode === 'replace') {
       S.state = obj;
     } else {
       var names = {};
       S.state.profiles.forEach(function (p) { names[p.name] = p; });
       obj.profiles.forEach(function (p) {
-        if (names[p.name]) {
-          // 同名档案合并：保留朵数与历史，简单覆盖为较大值
-          var old = names[p.name];
-          old.flowers = Math.max(old.flowers, p.flowers);
-          old.earned = Math.max(old.earned, p.earned);
-          old.days = Object.assign({}, old.days, p.days);
-          old.honors = (old.honors || []).concat(p.honors || []);
-          old.badges = Object.assign({}, old.badges, p.badges || {});
-        } else {
+        var old = names[p.name];
+        if (old) S.mergeProfile(old, p);
+        else {
           S.ensureProfile(p);
           S.state.profiles.push(p);
         }
       });
     }
     S.migrate();
+    /* 备份不含 PIN：不要让导入把本机已设密码清空 */
+    if (S.state.settings && !S.state.settings.pin && prevPin) S.state.settings.pin = prevPin;
     S.save();
     return true;
   };

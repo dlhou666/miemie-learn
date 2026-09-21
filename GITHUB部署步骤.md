@@ -86,16 +86,18 @@ git push
 
 ## 七、已知遗留问题与本机环境坑
 
-### 1. `.github/workflows/` 两个文件未提交
+### 1. `ios-build.yml` 已入库，但推送令牌可能没有 `workflow` 权限
 
-`pages.yml` 和 `ios-build.yml` **不在仓库里**。原因是首次部署用的令牌只勾了 `repo`，没有 `workflow` 权限；GitHub 对无权限的 workflow 文件操作**返回 404 而非 403**（故意隐藏），所以被跳过。
+`.github/workflows/ios-build.yml` **现在已经在本仓库里**（三个任务：simulator / unsigned-ipa / ipa）。
+`pages.yml` 不需要——Pages 走的是「从分支部署」，不依赖 Actions。
 
-Pages 已改用「从分支部署」，不依赖 Actions，网页版不受影响。但 **iOS 云端编译暂时用不了**，需要补上 `ios-build.yml`。
+要把它推上去，令牌必须勾 **`workflow`**：GitHub 对无权限的 workflow 文件操作**返回 404 而非 403**（故意隐藏），
+`tools/gh-api-push.js` 会识别这种情况并跳过该文件（日志里会写明「跳过 N 个：令牌无 workflow 权限」），
+其余文件照常提交。重新生成令牌时勾 `repo` + `workflow` 即可：https://github.com/settings/tokens/new
 
-二选一：
-
-- **重新生成令牌**：https://github.com/settings/tokens/new → 勾选 **`repo` + `workflow`** → 交给助手补交（推荐）
-- **网页手动创建**：仓库 → Add file → Create new file → 路径填 `.github/workflows/ios-build.yml` → 粘贴本地同名文件内容 → Commit
+> 提示：旧版脚本建 tree 时不带 `base_tree`，会把本地索引里没有的文件从远端删掉——
+> 按「网页手动创建 workflow」这条路走，下次跑脚本就会把它删掉。现在已修：默认只增不改不删，
+> 只有显式加 `--prune` 才会删除远端独有文件。
 
 ### 2. 本机 `git push` 走不通
 

@@ -26,3 +26,8 @@ Thumbs.db
 
 # ---------- 本地临时文件 ----------
 *.log
+_check.txt
+
+# ---------- iOS 壳内的 Web 副本：由 scripts/sync-web.sh 生成，不入库 ----------
+# 曾经入库过，结果根目录改了代码、这里没同步，Xcode 里跑的还是旧版本。
+ios/MieMieLearn/Web/

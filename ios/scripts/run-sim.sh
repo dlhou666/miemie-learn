@@ -25,6 +25,11 @@ fi
 
 echo "📱 目标模拟器: $DEVICE"
 
+# 构建前先把根目录的 web 代码同步进 Web/ —— 否则模拟器里跑的是旧副本，
+# 表现为「改了代码但 App 里没变化」，极难排查。
+echo "🔄 同步 Web 资源..."
+bash "$IOS_DIR/scripts/sync-web.sh"
+
 xcodebuild -project "$SCHEME.xcodeproj" \
   -scheme "$SCHEME" \
   -configuration Debug \

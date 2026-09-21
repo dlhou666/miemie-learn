@@ -68,7 +68,7 @@ TEAM=XXXXXXXXXX ./build.sh auto
 
 ## 3.5 无 Mac？GitHub Actions 云端编译（Windows 友好）
 
-仓库自带工作流 `.github/workflows/ios-build.yml`，把 `mie-mie-app/` 推到 GitHub 仓库后，在 **Actions → iOS Cloud Build → Run workflow** 即可用苹果官方云 Mac 编译：
+仓库自带工作流 `.github/workflows/ios-build.yml`，把仓库推到 GitHub 后，在 **Actions → iOS Cloud Build → Run workflow** 即可用苹果官方云 Mac 编译：
 
 | Job | 需要 Apple 账号？ | 产物 | 真机安装 |
 |---|---|---|---|
@@ -173,7 +173,7 @@ SecTrustSetAnchorCertificatesOnly(trust, true)   // 只信任内置 CA
 | 交互手感 | 禁用双指缩放、双击缩放、长按菜单、橡皮筋回弹；按钮点击触发 `UIImpactFeedbackGenerator` |
 | 启动体验 | LaunchScreen 用设计稿主色 `#EDF5FC`，避免白屏闪烁 |
 
-H5 通过 `window.__NATIVE_SHELL__` 或 `webkit.messageHandlers.native` 判定运行环境，自动切换布局模式；在普通浏览器中仍保持 820×1180 等比缩放预览。
+H5 通过 `window.__NATIVE_SHELL__` 判定运行环境，据此隐藏 PWA 专属文案（如「重新添加到主屏幕」这类在原生 App 里不适用的提示）；布局本身仍全部由 CSS 安全区变量驱动，在普通浏览器中保持 820×1180 等比缩放预览。
 
 ---
 

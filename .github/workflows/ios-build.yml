@@ -1,0 +1,144 @@
+name: iOS Cloud Build
+
+# 云端 Mac 编译：无需本地 Mac，Actions 里手动触发。
+# 三个 job 互不依赖，按需单独跑（Actions → iOS Cloud Build → Run workflow）。
+on:
+  workflow_dispatch:
+
+jobs:
+  # ① 模拟器 .app：不签名，最快的验证通道
+  simulator:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      # Web/ 已加入 .gitignore（避免两份副本漂移），构建前必须先同步
+      - name: 同步 Web 资源
+        run: bash ios/scripts/sync-web.sh
+
+      - name: 构建模拟器版本
+        run: |
+          xcodebuild -project ios/MieMieLearn.xcodeproj \
+            -scheme MieMieLearn \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: 打包产物
+        run: |
+          APP=$(find build/DerivedData/Build/Products -maxdepth 2 -name "MieMieLearn.app" | head -n1)
+          mkdir -p artifacts && cp -R "$APP" artifacts/
+          cd artifacts && zip -qr ../MieMieLearn-simulator.zip MieMieLearn.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MieMieLearn-simulator
+          path: MieMieLearn-simulator.zip
+
+  # ② 未签名 IPA：免费路径，Windows 上用 Sideloadly 侧载（7 天有效可续签）
+  unsigned-ipa:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 同步 Web 资源
+        run: bash ios/scripts/sync-web.sh
+
+      - name: 构建真机版本（不签名）
+        run: |
+          xcodebuild -project ios/MieMieLearn.xcodeproj \
+            -scheme MieMieLearn \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: 打包成 IPA
+        # 未签名 IPA 就是 Payload/*.app 的 zip；签名交给 Sideloadly 在本地完成
+        run: |
+          APP=$(find build/DerivedData/Build/Products -maxdepth 2 -name "MieMieLearn.app" | head -n1)
+          mkdir -p Payload && cp -R "$APP" Payload/
+          zip -qr MieMieLearn-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MieMieLearn-unsigned-ipa
+          path: MieMieLearn-unsigned.ipa
+
+  # ③ 已签名 IPA：需要付费开发者账号（$99/年）与仓库里配置好的 Secrets
+  ipa:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 同步 Web 资源
+        run: bash ios/scripts/sync-web.sh
+
+      # 证书/描述文件必须是 base64 后的 Secrets，切勿把 p12 直接入库
+      - name: 导入签名证书
+        env:
+          CERT_BASE64:      ${{ secrets.SIGNING_CERT_P12_BASE64 }}
+          CERT_PASSWORD:    ${{ secrets.SIGNING_CERT_PASSWORD }}
+          PROFILE_BASE64:   ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -z "$CERT_BASE64" ]; then
+            echo "::error::未配置 SIGNING_CERT_P12_BASE64，跳过签名 job"
+            exit 1
+          fi
+          CERT_PATH=$RUNNER_TEMP/cert.p12
+          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          KEYCHAIN=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$CERT_BASE64" | base64 --decode -o "$CERT_PATH"
+          echo -n "$PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: 归档并导出 IPA
+        run: |
+          xcodebuild -project ios/MieMieLearn.xcodeproj \
+            -scheme MieMieLearn \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            -archivePath build/MieMieLearn.xcarchive \
+            archive
+
+          cat > build/ExportOptions.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>development</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>stripSwiftSymbols</key><true/>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath build/MieMieLearn.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MieMieLearn-ipa
+          path: build/export/*.ipa

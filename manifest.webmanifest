@@ -3,10 +3,10 @@
   "short_name": "咩咩学",
   "description": "小学生学习激励系统：制定计划、打卡赚积分、兑换奖励，卡通羊陪伴成长。",
   "lang": "zh-CN",
-  "start_url": "./index.html",
+  "id": "./",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#EDF5FC",
   "theme_color": "#EDF5FC",
   "icons": [

@@ -77,12 +77,18 @@ MM.uid = function (prefix) {
 
 MM.flowerSVG = function (size, color) {
   size = size || 16;
-  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 20 20" fill="none">' +
-    '<g fill="' + (color || 'currentColor') + '">' +
+  color = color || 'currentColor';
+  var cacheKey = size + '|' + color;
+  if (MM._svgCache && MM._svgCache[cacheKey]) return MM._svgCache[cacheKey];
+  var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 20 20" fill="none">' +
+    '<g fill="' + color + '">' +
     '<circle cx="10" cy="5" r="3.1"/><circle cx="15.2" cy="8.4" r="3.1"/>' +
     '<circle cx="12.9" cy="15" r="3.1"/><circle cx="7.1" cy="15" r="3.1"/>' +
     '<circle cx="4.8" cy="8.4" r="3.1"/></g>' +
     '<circle cx="10" cy="10" r="3.2" fill="#FFD451"/></svg>';
+  MM._svgCache = MM._svgCache || {};
+  MM._svgCache[cacheKey] = svg;
+  return svg;
 };
 
 MM.todayKey = function () { return MM.dateKey(new Date()); };

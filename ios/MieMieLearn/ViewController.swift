@@ -60,8 +60,8 @@ final class ViewController: UIViewController {
         let config = WKWebViewConfiguration()
         config.userContentController = controller
         config.allowsInlineMediaPlayback = true
-        // 仅内存缓存，避免离线场景下磁盘缓存脏数据
-        config.websiteDataStore = .default()
+        // 默认数据存储（磁盘缓存）：Bundle 离线页面本身不走网络，
+        // 保留磁盘缓存可让二次启动更快，且不存在「脏数据」风险。
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate  = self
@@ -150,12 +150,16 @@ final class ViewController: UIViewController {
 
     /// 启动时把 iCloud 上的快照合并回本地 H5（合并策略：取并集 / 较大值）
     private func pullFromCloud() {
-        guard let snapshot = CloudSync.load(key: cloudKey) else { return }
-        let escaped = snapshot
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
-        let js = "if (window.MMCloudRestore) { window.MMCloudRestore('\(escaped)'); }"
+        guard let snapshot = CloudSync.load(key: cloudKey), !snapshot.isEmpty else { return }
+        /* 用 JSON 编码器生成 JS 字符串字面量：JSON 是 JS 的子集，
+         * 引号 / 反斜杠 / 换行会被正确转义，手拼转义迟早漏字符。
+         * U+2028 / U+2029 在 JSON 里合法、在 JS 字符串字面量里会截断语句，单独处理。 */
+        guard let data = try? JSONSerialization.data(withJSONObject: snapshot, options: []),
+              var literal = String(data: data, encoding: .utf8) else { return }
+        literal = literal
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        let js = "if (window.MMCloudRestore) { window.MMCloudRestore(\(literal)); }"
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 }
@@ -176,10 +180,24 @@ private final class MessageBridge: NSObject, WKScriptMessageHandler {
 // MARK: - iCloud 键值同步（需 Signing & Capabilities 勾选 iCloud → Key-value storage）
 
 private enum CloudSync {
-    static func save(_ payload: String, key: String) {
+    /// NSUbiquitousKeyValueStore 单键硬上限 1MB。超限写入会静默失败
+    /// （synchronize() 照样返回 true，界面上看不出同步已经死了），
+    /// 所以这里先量尺寸，超了就明确跳过并回报，不做无意义的写入。
+    static let limitBytes = 900 * 1024
+
+    @discardableResult
+    static func save(_ payload: String, key: String) -> Bool {
+        let size = payload.utf8.count
+        guard size <= limitBytes else {
+            print("[iCloud] 快照 \(size/1024)KB 超过 \(limitBytes/1024)KB，跳过本次上传")
+            return false
+        }
         NSUbiquitousKeyValueStore.default.set(payload, forKey: key)
-        NSUbiquitousKeyValueStore.default.synchronize()
+        let ok = NSUbiquitousKeyValueStore.default.synchronize()
+        if !ok { print("[iCloud] synchronize 失败，本次改动可能未上传") }
+        return ok
     }
+
     static func load(key: String) -> String? {
         NSUbiquitousKeyValueStore.default.synchronize()
         return NSUbiquitousKeyValueStore.default.string(forKey: key)
